@@ -1,11 +1,7 @@
 const { replyText, replyWithPreferredFormat } = require("./messages");
 const { sendVoiceReply } = require("../services/media");
 const { getPrimaryRouteLabel } = require("../services/ai");
-const { 
-  getLiveInfoCache, 
-  getWebInfoCache, 
-  clearCaches 
-} = require("../services/web");
+const { getLiveInfoCache, getWebInfoCache, clearCaches } = require("../services/web");
 const { isOwner } = require("../utils");
 
 function startReminderService(sock, reminders, saveDatabase) {
@@ -62,7 +58,7 @@ function startProactiveMessaging(sock, userProfiles, saveDatabase) {
   }, 3600000);
 }
 
-async function handleOwnerCommands(sock, sender, lowerMsg, textBody, userMoods, userProfiles, reminders, PARTNER_NAME, OWNER_NAME) {
+async function handleOwnerCommands(sock, sender, lowerMsg, textBody, userMoods, userProfiles, reminders, chatMemory, PARTNER_NAME, OWNER_NAME) {
   if (lowerMsg === "/owner") {
     await replyText(
       sock,
@@ -74,9 +70,7 @@ async function handleOwnerCommands(sock, sender, lowerMsg, textBody, userMoods, 
     return true;
   }
   if (lowerMsg === "/resetme") {
-    require("../config"); // for MAP access if needed
-    const chatMemory = new Map(); // This needs to be passed in
-    if (global.chatMemory) global.chatMemory.delete(sender);
+    chatMemory.delete(sender);
     await replyText(sock, sender, "Oke kak, memory obrolan sementaramu sudah aku reset ya :3");
     return true;
   }

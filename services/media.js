@@ -5,6 +5,7 @@ const axios = require("axios");
 const { execFile } = require("child_process");
 const {
   qwenClient,
+  QWEN_API_KEY,
   QWEN_MODEL_VISION,
   QWEN_MODEL_ASR,
   QWEN_MODEL_TTS,
@@ -169,7 +170,8 @@ ${captionInstruction}`,
 }
 
 async function generateImageWithQwen(prompt) {
-  if (!QWEN_MODEL_IMAGE) throw new Error("QWEN_API_KEY belum diisi");
+  if (!QWEN_API_KEY) throw new Error("QWEN_API_KEY belum diisi");
+  if (!QWEN_MODEL_IMAGE) throw new Error("QWEN_MODEL_IMAGE belum diisi");
   const response = await axios.post(
     "https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation",
     {
@@ -195,7 +197,7 @@ async function generateImageWithQwen(prompt) {
     },
     {
       headers: {
-        Authorization: `Bearer QWEN_API_KEY`,
+        Authorization: `Bearer ${QWEN_API_KEY}`,
         "Content-Type": "application/json",
       },
       timeout: 90000,
@@ -230,7 +232,7 @@ async function synthesizeVoiceWithQwen(text) {
     },
     {
       headers: {
-        Authorization: `Bearer ${require("../config").QWEN_API_KEY}`,
+        Authorization: `Bearer ${QWEN_API_KEY}`,
         "Content-Type": "application/json",
       },
       timeout: 90000,

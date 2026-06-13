@@ -3,10 +3,7 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLat
 const qrcode = require("qrcode-terminal");
 
 // Config & Services
-const {
-  MAX_HISTORY,
-  QWEN_API_KEY,
-} = require("./config");
+const { MAX_HISTORY, QWEN_API_KEY } = require("./config");
 
 // Utils
 const {
@@ -25,59 +22,29 @@ const {
 } = require("./utils");
 
 // Database
-const {
-  userProfiles,
-  getUserProfile,
-  updateUserProfile,
-  loadDatabase,
-  saveDatabase,
-} = require("./services/database");
+const { userProfiles, getUserProfile, updateUserProfile, loadDatabase, saveDatabase, getReminders } = require("./services/database");
 
 // AI Services
-const {
-  getProviderCandidates,
-  getPrimaryRouteLabel,
-  selectReasoningRoute,
-  getReplyFromProviders,
-} = require("./services/ai");
+const { getProviderCandidates, getPrimaryRouteLabel, selectReasoningRoute, getReplyFromProviders } = require("./services/ai");
 
 // Web Services
 const { getRagMode, getRagContext } = require("./services/web");
 
 // Media Services
-const {
-  downloadBaileysMedia,
-  transcribeAudioWithQwen,
-  analyzeIncomingImage,
-  generateImageWithQwen,
-} = require("./services/media");
+const { downloadBaileysMedia, transcribeAudioWithQwen, analyzeIncomingImage, generateImageWithQwen } = require("./services/media");
 
 // Persona & Intent
-const {
-  detectUserEmotion,
-  detectIntent,
-  getInstantReply,
-  getRelationshipMode,
-  getHinaPersona,
-} = require("./services/persona");
+const { detectUserEmotion, detectIntent, getInstantReply, getRelationshipMode, getHinaPersona } = require("./services/persona");
 
 // Handlers
-const {
-  startReminderService,
-  startProactiveMessaging,
-  handleOwnerCommands,
-} = require("./handlers/services");
+const { startReminderService, startProactiveMessaging, handleOwnerCommands } = require("./handlers/services");
 
-const {
-  startTyping,
-  replyText,
-  replyWithPreferredFormat,
-} = require("./handlers/messages");
+const { startTyping, replyText, replyWithPreferredFormat } = require("./handlers/messages");
 
 // Global state
 const chatMemory = new Map();
 const userMoods = new Map();
-const reminders = [];
+let reminders = null;
 let isServicesStarted = false;
 
 async function connectToWhatsApp() {
@@ -167,7 +134,22 @@ async function connectToWhatsApp() {
       }
 
       const lowerMsg = textBody.toLowerCase();
-      if (textBody && (await handleOwnerCommands(sock, sender, lowerMsg, textBody, userMoods, userProfiles, reminders, require("./config").PARTNER_NAME, require("./config").OWNER_NAME))) return;
+      if (
+        textBody &&
+        (await handleOwnerCommands(
+          sock,
+          sender,
+          lowerMsg,
+          textBody,
+          userMoods,
+          userProfiles,
+          reminders,
+          chatMemory,
+          require("./config").PARTNER_NAME,
+          require("./config").OWNER_NAME
+        ))
+      )
+        return;
 
       const currentMood = userMoods.get(sender) || (isOwner(sender) ? "senang" : "ceria");
       const userEmotion = detectUserEmotion(textBody || "gambar");
@@ -293,4 +275,5 @@ async function connectToWhatsApp() {
 }
 
 loadDatabase();
+reminders = getReminders();
 connectToWhatsApp();
