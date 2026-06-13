@@ -1,0 +1,71 @@
+{
+  "userProfiles": {
+    "124197653196846@lid": {
+      "name": "sadflix07",
+      "messageCount": 147,
+      "intimacy": 6.880000000000005,
+      "lastEmotion": "netral",
+      "lastIntent": "short_reply",
+      "lastTopic": "hmpppt.. aku kan yang bikin kamu",
+      "lastInteractionAt": 1781177127542,
+      "createdAt": 1780741461470
+    },
+    "236549719511070@lid": {
+      "name": "Sin",
+      "messageCount": 60,
+      "intimacy": 3.400000000000002,
+      "lastEmotion": "netral",
+      "lastIntent": "short_reply",
+      "lastTopic": "Pinteran meta",
+      "lastInteractionAt": 1781344014916,
+      "createdAt": 1780753754613
+    },
+    "status@broadcast": {
+      "name": "kakak",
+      "messageCount": 108,
+      "intimacy": 5.320000000000004,
+      "lastEmotion": "netral",
+      "lastIntent": "short_reply",
+      "lastTopic": "lucu banget gededak",
+      "lastInteractionAt": 1781363810043,
+      "createdAt": 1780773332522
+    },
+    "164880153886959@lid": {
+      "name": "kakak",
+      "messageCount": 8,
+      "intimacy": 1.3200000000000003,
+      "lastEmotion": "netral",
+      "lastIntent": "ngobrol",
+      "lastTopic": "anda buat salah ap sampe saya blokir",
+      "lastInteractionAt": 1781181643031,
+      "createdAt": 1781180862822
+    },
+    "60834604666905@lid": {
+      "name": "kakak",
+      "messageCount": 5,
+      "intimacy": 1.2000000000000002,
+      "lastEmotion": "netral",
+      "lastIntent": "short_reply",
+      "lastTopic": "Nuju loading",
+      "lastInteractionAt": 1781287046790,
+      "createdAt": 1781286873768
+    },
+    "42408758771874@lid": {
+      "name": "kakak",
+      "messageCount": 2,
+      "intimacy": 1.08,
+      "lastEmotion": "netral",
+      "lastIntent": "bertanya",
+      "lastTopic": "kamu siapah",
+      "lastInteractionAt": 1781369884397,
+      "createdAt": 1781369864292
+    }
+  },
+  "reminders": [
+    {
+      "jid": "236549719511070@lid",
+      "time": 1781372700000,
+      "message": "Jangan lupa istirahat, kak"
+    }
+  ]
+}

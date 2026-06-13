@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.*
+auth_info_baileys/
+sessions/
+session/
+store/
+creds.json
+*.session
+*.db
+*.sqlite
+npm-debug.log*
