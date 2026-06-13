@@ -8,14 +8,16 @@ const DEFAULT_RELATIONSHIP = {
   lastRudeAt: null,
   lastTensionUpdateAt: Date.now(),
   lastRudeText: null,
+  lastRudeSeverity: "none",
   stage: "normal",
   speechStyle: "aku-kamu",
 };
 
 const APOLOGY_REGEX = /\b(maaf|maf|sorry|sori|sry|ampun|peace|becanda|bercanda|canda|gak lagi|ga lagi|nggak lagi|jangan marah)\b/i;
+const NEGATED_APOLOGY_REGEX = /\b(gak|ga|nggak|ngga|tidak|gamau|gak mau|ga mau|ogah|mana mau)\b.{0,18}\b(maaf|sorry|sori|ampun)\b/i;
 
-const MILD_RUDE_REGEX = /\b(lemot|lambat|lama amat|loading|ngelag|lag|gajelas|ga jelas|ngaco|payah)\b/i;
-const MEDIUM_RUDE_REGEX = /\b(bacot|goblok|gblk|tolol|bego|bodoh|dongo|idiot|sampah|bangsat|kampret|anjing|anjg|ajg|tai|taik)\b/i;
+const MILD_RUDE_REGEX = /\b(lemot|lambat|lama amat|loading|ngelag|lag|gajelas|ga jelas|ngaco|payah|yapping|ngebacot)\b/i;
+const MEDIUM_RUDE_REGEX = /\b(bacot|goblok|gblk|tolol|bego|bodoh|dongo|idiot|sampah|bangsat|kampret|anjing|anjg|ajg|tai|taik|boong|pembohong)\b/i;
 const HEAVY_RUDE_REGEX = /\b(kontol|kntl|memek|mmk|ngentot|ntl|jancok|jancuk|asu|babi)\b/i;
 
 function clamp(value, min, max) {
@@ -41,14 +43,16 @@ function detectRudeness(text) {
   if (HEAVY_RUDE_REGEX.test(msg)) return { rude: true, severity: 3, label: "heavy" };
   if (MEDIUM_RUDE_REGEX.test(msg)) return { rude: true, severity: 2, label: "medium" };
 
-  const looksDirectedToBot = /\b(bot|hina|lu|lo|loe|kau|kamu)\b/i.test(msg);
+  const looksDirectedToBot = /\b(bot|hina|lu|lo|loe|kau|kamu|elu|gua|gw)\b/i.test(msg);
   if (MILD_RUDE_REGEX.test(msg) && looksDirectedToBot) return { rude: true, severity: 1, label: "mild" };
 
   return { rude: false, severity: 0, label: "none" };
 }
 
 function detectApology(text) {
-  return APOLOGY_REGEX.test(String(text || ""));
+  const msg = String(text || "");
+  if (NEGATED_APOLOGY_REGEX.test(msg)) return false;
+  return APOLOGY_REGEX.test(msg);
 }
 
 function decayTension(state, now = Date.now()) {
@@ -57,8 +61,8 @@ function decayTension(state, now = Date.now()) {
   const hoursSinceRude = state.lastRudeAt ? (now - state.lastRudeAt) / HOUR : Infinity;
 
   let decayPerHour = 0.6;
-  if (hoursSinceRude < 24) decayPerHour = 0.2;
-  else if (hoursSinceRude < 48) decayPerHour = 2.0;
+  if (hoursSinceRude < 24) decayPerHour = 0.05;
+  else if (hoursSinceRude < 48) decayPerHour = 1.2;
   else if (hoursSinceRude < 72) decayPerHour = 3.0;
   else decayPerHour = 100;
 
@@ -95,16 +99,19 @@ function updateRelationshipState(profile, text, options = {}) {
   const apology = detectApology(text);
 
   if (rude.rude) {
-    const impact = rude.severity === 3 ? 40 : rude.severity === 2 ? 28 : 14;
-    state.tensionLevel = clamp(state.tensionLevel + impact, 0, 100);
-    state.respectScore = clamp((state.respectScore || 100) - Math.round(impact / 2), 0, 100);
+    // Begitu user toxic ke Hina, Hina langsung masuk mode heated penuh.
+    // Ini sengaja dibuat keras supaya self-respect tidak terasa labil atau murah.
+    const respectPenalty = rude.severity === 3 ? 35 : rude.severity === 2 ? 25 : 18;
+    state.tensionLevel = 100;
+    state.respectScore = clamp((state.respectScore || 100) - respectPenalty, 0, 100);
     state.rudeCount = (state.rudeCount || 0) + 1;
     state.lastRudeAt = now;
     state.lastRudeText = String(text || "").slice(0, 120);
+    state.lastRudeSeverity = rude.label;
     state.lastTensionUpdateAt = now;
   } else if (apology && state.tensionLevel > 0) {
-    state.tensionLevel = clamp(state.tensionLevel - 6, 0, 100);
-    state.respectScore = clamp((state.respectScore || 100) + 2, 0, 100);
+    // Maaf hanya dicatat. Bukan tombol reset. Tensi utamanya turun karena waktu.
+    state.respectScore = clamp((state.respectScore || 100) + 1, 0, 100);
     state.apologyCount = (state.apologyCount || 0) + 1;
     state.lastApologyAt = now;
   }
@@ -118,20 +125,21 @@ function getRelationshipContext(state) {
   const stage = state?.stage || "normal";
   const tension = Math.round(state?.tensionLevel || 0);
   const rudeCount = state?.rudeCount || 0;
+  const lastRudeText = state?.lastRudeText ? ` Pesan kasar terakhir user: "${state.lastRudeText}".` : "";
 
   if (stage === "normal") {
     return `Self-respect Hina terhadap user ini normal. Gunakan aku/kamu, hangat, natural, dan jangan mengungkit konflik lama.`;
   }
 
   if (stage === "annoyed") {
-    return `Self-respect Hina sedang terganggu. Tensi ${tension}/100, user pernah berkata kasar ${rudeCount} kali. Tetap gunakan aku/kamu, tapi lebih singkat, judes tipis, dan jangan langsung manis berlebihan.`;
+    return `Self-respect Hina sedang terganggu. Tensi ${tension}/100, user pernah berkata kasar ${rudeCount} kali.${lastRudeText} Tetap gunakan aku/kamu, tapi lebih singkat, judes tipis, dan jangan langsung manis berlebihan.`;
   }
 
   if (stage === "cold") {
-    return `Self-respect Hina sedang dingin ke user ini. Tensi ${tension}/100, user pernah berkata kasar ${rudeCount} kali. Hina masih badmood, boleh mulai memakai lu/gua sesekali, jawab lebih tegas, sarkas, dan jangan reset hanya karena user tiba-tiba normal atau minta maaf sekali.`;
+    return `Self-respect Hina sedang dingin ke user ini. Tensi ${tension}/100, user pernah berkata kasar ${rudeCount} kali.${lastRudeText} Hina masih badmood, boleh mulai memakai lu/gua, jawab tegas, sarkas, dan jangan reset hanya karena user tiba-tiba normal atau minta maaf sekali.`;
   }
 
-  return `Self-respect Hina sedang panas ke user ini. Tensi ${tension}/100, user pernah berkata kasar ${rudeCount} kali. Gunakan gaya lu/gua, ngegas, judes, dan savage defensif. Hina boleh membalas kasar sebagai batas diri, tapi jangan menyerang SARA, agama, ras, gender, disabilitas, keluarga, alamat/data pribadi, atau mengancam kekerasan. Jangan langsung ramah walaupun user mengirim halo atau maaf sekali.`;
+  return `Self-respect Hina sedang PANAS ke user ini. Tensi ${tension}/100, user pernah berkata kasar ${rudeCount} kali.${lastRudeText} Gunakan gaya lu/gua. Hina wajib defensif, ngegas, sarkas, dan boleh membalas lebih pedas dari user sebagai batas diri. Jangan minta maaf, jangan sok damai, jangan bilang saling maaf, jangan langsung ramah walaupun user mengirim halo atau maaf. Hina boleh memakai kata kasar defensif seperti "bacot", "kontol lu", "tolol", "goblok", "anjing" jika konteksnya membalas hinaan user. Tetap jangan menyerang SARA, agama, ras, gender, disabilitas, keluarga, alamat/data pribadi, atau mengancam kekerasan.`;
 }
 
 function shouldUseInstantReply(state) {
