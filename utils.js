@@ -1,4 +1,4 @@
-const { OWNER_NUMBER, PARTNER_NUMBER, OWNER_NAME, PARTNER_NAME, VALID_MOODS } = require("../config");
+const { OWNER_NUMBER, PARTNER_NUMBER, OWNER_NAME, PARTNER_NAME, VALID_MOODS } = require("./config");
 
 function extractNumberFromJid(jid) {
   if (!jid) return "";
