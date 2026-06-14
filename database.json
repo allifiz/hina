@@ -1,24 +1,49 @@
 {
   "userProfiles": {
     "124197653196846@lid": {
-      "name": "sadflix07",
-      "messageCount": 197,
-      "intimacy": 8.879999999999987,
-      "lastEmotion": "netral",
-      "lastIntent": "bertanya",
-      "lastTopic": "iya jam beraapa ini?",
-      "lastInteractionAt": 1781375885216,
-      "createdAt": 1780741461470
-    },
-    "236549719511070@lid": {
-      "name": "Sin",
-      "messageCount": 60,
-      "intimacy": 3.400000000000002,
+      "name": "Allif",
+      "messageCount": 281,
+      "intimacy": 10,
       "lastEmotion": "netral",
       "lastIntent": "short_reply",
-      "lastTopic": "Pinteran meta",
-      "lastInteractionAt": 1781344014916,
-      "createdAt": 1780753754613
+      "lastTopic": "loh ko bukan gw, jelas jelas ini wa gw allif",
+      "lastInteractionAt": 1781419200242,
+      "createdAt": 1780741461470,
+      "relationship": {
+        "respectScore": 100,
+        "tensionLevel": 0,
+        "rudeCount": 0,
+        "apologyCount": 0,
+        "lastRudeAt": null,
+        "lastTensionUpdateAt": 1781390957558,
+        "lastRudeText": null,
+        "lastRudeSeverity": "none",
+        "stage": "normal",
+        "speechStyle": "aku-kamu",
+        "lastApologyAt": null
+      }
+    },
+    "236549719511070@lid": {
+      "name": "sinta",
+      "messageCount": 72,
+      "intimacy": 3.8800000000000026,
+      "lastEmotion": "netral",
+      "lastIntent": "short_reply",
+      "lastTopic": "Alif cinta mantan",
+      "lastInteractionAt": 1781389662280,
+      "createdAt": 1780753754613,
+      "relationship": {
+        "respectScore": 100,
+        "tensionLevel": 0,
+        "rudeCount": 0,
+        "apologyCount": 0,
+        "lastRudeAt": null,
+        "lastTensionUpdateAt": 1781389662281,
+        "lastRudeText": null,
+        "lastRudeSeverity": "none",
+        "stage": "normal",
+        "speechStyle": "aku-kamu"
+      }
     },
     "status@broadcast": {
       "name": "kakak",
@@ -52,13 +77,25 @@
     },
     "42408758771874@lid": {
       "name": "kakak",
-      "messageCount": 4,
-      "intimacy": 1.1600000000000001,
-      "lastEmotion": "netral",
+      "messageCount": 6,
+      "intimacy": 1.2400000000000002,
+      "lastEmotion": "marah",
       "lastIntent": "short_reply",
       "lastTopic": "kamu siapah",
-      "lastInteractionAt": 1781369963511,
-      "createdAt": 1781369864292
+      "lastInteractionAt": 1781391578916,
+      "createdAt": 1781369864292,
+      "relationship": {
+        "respectScore": 65,
+        "tensionLevel": 100,
+        "rudeCount": 1,
+        "apologyCount": 0,
+        "lastRudeAt": 1781391578917,
+        "lastTensionUpdateAt": 1781391578917,
+        "lastRudeText": "oi kontol",
+        "lastRudeSeverity": "heavy",
+        "stage": "heated",
+        "speechStyle": "lu-gua"
+      }
     }
   },
   "reminders": []

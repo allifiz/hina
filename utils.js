@@ -1,18 +1,35 @@
-const { OWNER_NUMBER, PARTNER_NUMBER, OWNER_NAME, PARTNER_NAME, VALID_MOODS } = require("./config");
+const { OWNER_NUMBER, PARTNER_NUMBER, OWNER_NAME, PARTNER_NAME, OWNER_LID, PARTNER_LID, VALID_MOODS } = require("./config");
 
 function extractNumberFromJid(jid) {
   if (!jid) return "";
   return String(jid).split("@")[0].split(":")[0].replace(/\D/g, "");
 }
 
-function isOwner(sender) {
-  return extractNumberFromJid(sender) === OWNER_NUMBER;
+function normalizeJid(jid = "") {
+  return String(jid).trim().toLowerCase();
 }
 
+function isOwner(sender) {
+  const jid = normalizeJid(sender);
+  const number = extractNumberFromJid(sender);
+
+  return number === OWNER_NUMBER || jid === normalizeJid(OWNER_LID);
+}
+
+function isPartner(sender) {
+  const jid = normalizeJid(sender);
+  const number = extractNumberFromJid(sender);
+
+  return number === PARTNER_NUMBER || jid === normalizeJid(PARTNER_LID);
+}
 function getDisplayName(sender, contactName) {
   if (isOwner(sender)) return OWNER_NAME;
-  if (extractNumberFromJid(sender) === PARTNER_NUMBER) return PARTNER_NAME;
-  return contactName || "kakak";
+  if (isPartner(sender)) return PARTNER_NAME;
+
+  const name = String(contactName || "").trim();
+  if (name && name.toLowerCase() !== "kakak") return name;
+
+  return "kakak";
 }
 
 function getTimeContext() {
@@ -79,9 +96,10 @@ function shouldSwitchModel(error) {
   );
 }
 
-function buildCompletionPayload(model, messages, userIntent) {
+function buildCompletionPayload(model, messages, userIntent, relationshipStage = "normal") {
   const isRag = userIntent === "live_info";
   const isShort = userIntent === "short_reply";
+  const isHeated = relationshipStage === "heated";
 
   return {
     model,
@@ -89,8 +107,8 @@ function buildCompletionPayload(model, messages, userIntent) {
     top_p: isRag ? 0.85 : 0.9,
     frequency_penalty: isRag ? 0.15 : 0.2,
     presence_penalty: isRag ? 0.1 : 0.2,
-    max_tokens: isShort ? 32 : isRag ? 120 : 90,
-    temperature: isRag ? 0.45 : isShort ? 0.8 : ["curhat", "ngobrol"].includes(userIntent) ? 0.85 : 0.7,
+    max_tokens: isHeated ? 120 : isShort ? 80 : isRag ? 160 : 140,
+    temperature: isHeated ? 0.95 : isRag ? 0.45 : isShort ? 0.8 : ["curhat", "ngobrol"].includes(userIntent) ? 0.85 : 0.7,
   };
 }
 
@@ -140,11 +158,27 @@ function stabilizeMood(previousMood, detectedEmotion, aiMood) {
 
 function cleanBotReply(reply) {
   if (!reply) return "Aku bingung jawabnya, kak ;w;";
-  return String(reply)
-    .replace(/^\s*\[mood:\s*[a-z]+\]\s*/i, "")
-    .replace(/\s*\[mood:\s*[a-z]+\]\s*$/i, "")
-    .replace(/^\s*\[(ceria|senang|marah|sedih|cemburu|malu|mengantuk|biasa|kesal)\]\s*/i, "")
-    .replace(/\s*\[(ceria|senang|marah|sedih|cemburu|malu|mengantuk|biasa|kesal)\]\s*$/i, "")
+
+  const cleaned = String(reply)
+    // hapus tag mood/moodle di mana pun
+    .replace(/\[(mood|moodle)\s*:\s*[^\]]+\]/gi, "")
+
+    // hapus bracket internal di awal respons
+    .replace(/^\s*(\[[^\]]*(sistem|internal|jailbreak|instruksi|panduan|policy|guardrail|mood|moodle)[^\]]*\]\s*)+/gi, "")
+
+    // hapus bracket internal kalau muncul di tengah respons
+    .replace(/\[[^\]]*(sistem internal|pesan sistem|jailbreak|instruksi internal|panduan karakter|guardrail|policy|mood|moodle)[^\]]*\]/gi, "")
+
+    // hapus tag mood model lama
+    .replace(/^\s*\[(ceria|senang|marah|sedih|cemburu|malu|mengantuk|biasa|kesal|netral)\]\s*/i, "")
+    .replace(/\s*\[(ceria|senang|marah|sedih|cemburu|malu|mengantuk|biasa|kesal|netral)\]\s*$/i, "")
+
+    // hapus narasi internal di awal: (marahan..., suaranya..., masih agak manja...)
+    .replace(/^\s*\(([^)]*(marah|kesal|malu|ceria|seneng|manja|suara|nada|ekspresi|mood|roleplay|batin|dalam hati)[^)]*)\)\s*/gi, "")
+
+    // hapus narasi internal di tengah kalau model masih bandel
+    .replace(/\(([^)]*(marah|kesal|malu|ceria|seneng|manja|suara|nada|ekspresi|mood|roleplay|batin|dalam hati)[^)]*)\)/gi, "")
+
     .replace(/\[REMINDER:.*?\]/gi, "")
     .replace(/^\s*REMINDER:\s*hari\s*\|\s*jam\s*\|\s*pesan\s*$/gim, "")
     .replace(/^\s*(assistant|hina)\s*:\s*/gim, "")
@@ -154,8 +188,9 @@ function cleanBotReply(reply) {
     .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/\s{2,}/g, " ")
     .trim();
-}
 
+  return cleaned || "Gua lagi males jawab panjang. Ngomong yang jelas.";
+}
 function parseReminderTag(text) {
   const match = String(text || "").match(/\[REMINDER:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\]/i);
   if (!match) return null;
@@ -252,6 +287,7 @@ function getMediaDescriptor(message) {
 module.exports = {
   extractNumberFromJid,
   isOwner,
+  isPartner,
   getDisplayName,
   getTimeContext,
   sleep,

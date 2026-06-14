@@ -35,6 +35,7 @@ const { downloadBaileysMedia, transcribeAudioWithQwen, analyzeIncomingImage, gen
 
 // Persona & Intent
 const { detectUserEmotion, detectIntent, getInstantReply, getRelationshipMode, getHinaPersona } = require("./services/persona");
+const { updateRelationshipState, getRelationshipContext, shouldUseInstantReply } = require("./services/relationship");
 
 // Handlers
 const { startReminderService, startProactiveMessaging, handleOwnerCommands } = require("./handlers/services");
@@ -46,6 +47,18 @@ const chatMemory = new Map();
 const userMoods = new Map();
 let reminders = null;
 let isServicesStarted = false;
+
+function isPrivilegedSender(sender) {
+  const number = extractNumberFromJid(sender);
+  return isOwner(sender) || number === require("./config").PARTNER_NUMBER;
+}
+
+function getMoodForRelationship(currentMood, relationshipState) {
+  const stage = relationshipState?.stage || "normal";
+  if (stage === "heated") return "marah";
+  if (stage === "cold" || stage === "annoyed") return "kesal";
+  return currentMood;
+}
 
 async function connectToWhatsApp() {
   const { state, saveCreds } = await useMultiFileAuthState("auth_info_baileys");
@@ -133,6 +146,12 @@ async function connectToWhatsApp() {
         console.log(`Transkrip audio dari ${sender}: ${textBody || "[kosong]"}`);
       }
 
+      const existingProfile = userProfiles.get(sender);
+      if (existingProfile?.banned && !isOwner(sender)) {
+        console.log(`[Ban] Pesan dari ${sender} diabaikan.`);
+        return;
+      }
+
       const lowerMsg = textBody.toLowerCase();
       if (
         textBody &&
@@ -146,7 +165,8 @@ async function connectToWhatsApp() {
           reminders,
           chatMemory,
           require("./config").PARTNER_NAME,
-          require("./config").OWNER_NAME
+          require("./config").OWNER_NAME,
+          saveDatabase
         ))
       )
         return;
@@ -155,9 +175,19 @@ async function connectToWhatsApp() {
       const userEmotion = detectUserEmotion(textBody || "gambar");
       const userIntent = mediaDescriptor?.kind === "image" ? "analisis_gambar" : detectIntent(textBody || "");
       const preferredProvider = selectReasoningRoute(textBody || "gambar", userIntent, userEmotion);
-      const userName = getDisplayName(sender, userProfiles.get(sender)?.name);
+      const oldName = userProfiles.get(sender)?.name;
+
+      const waName = msg.pushName || msg.verifiedBizName || msg.notifyName || oldName;
+
+      const userName = getDisplayName(sender, oldName && oldName !== "kakak" ? oldName : waName);
       const profile = updateUserProfile(sender, userEmotion, userIntent, textBody || `[${mediaDescriptor?.kind || "media"}]`, userName, extractNumberFromJid, isOwner);
+      const relationshipState = updateRelationshipState(profile, textBody || "", {
+        isPrivileged: isPrivilegedSender(sender),
+      });
+      const relationshipContext = getRelationshipContext(relationshipState);
       const relationshipMode = getRelationshipMode(sender, profile, isOwner, extractNumberFromJid);
+      const moodForPrompt = getMoodForRelationship(currentMood, relationshipState);
+      saveDatabase();
 
       if (mediaIsAudio && !textBody) {
         await replyWithPreferredFormat(sock, sender, "aku dengerin tadi, tapi belum nangkep isinya jelas ;w; coba VN yang lebih jelas yaa", {
@@ -167,9 +197,9 @@ async function connectToWhatsApp() {
       }
 
       if (mediaDescriptor?.kind === "image") {
-        const visualReply = await analyzeIncomingImage(downloadedMedia, currentMood, userName, sender, profile, textBody, getHinaPersona);
+        const visualReply = await analyzeIncomingImage(downloadedMedia, moodForPrompt, userName, sender, profile, textBody, getHinaPersona);
         const { mood: aiMood, reply } = extractMoodAndCleanReply(visualReply);
-        userMoods.set(sender, stabilizeMood(currentMood, userEmotion, aiMood));
+        userMoods.set(sender, stabilizeMood(moodForPrompt, userEmotion, aiMood));
         await replyWithPreferredFormat(sock, sender, cleanBotReply(reply), {
           voiceReply: false,
         });
@@ -179,7 +209,7 @@ async function connectToWhatsApp() {
       if (!textBody) return;
 
       const instantReply = getInstantReply(textBody, userName);
-      if (instantReply && userIntent === "short_reply") {
+      if (instantReply && userIntent === "short_reply" && shouldUseInstantReply(relationshipState)) {
         await replyWithPreferredFormat(sock, sender, instantReply, {
           voiceReply: shouldReplyAsVoice,
         });
@@ -216,13 +246,15 @@ async function connectToWhatsApp() {
           role: "system",
           content:
             getHinaPersona({
-              currentMood,
+              currentMood: moodForPrompt,
               userName,
               isCreator: isOwner(sender),
               userEmotion,
               userIntent,
               timeContext: getTimeContext(),
               relationshipMode,
+              relationshipState,
+              relationshipContext,
               profile,
               isOwner,
               OWNER_NAME: require("./config").OWNER_NAME,
@@ -252,10 +284,11 @@ async function connectToWhatsApp() {
       }
 
       const { mood: aiMood, reply } = extractMoodAndCleanReply(rawReply);
-      const finalMood = stabilizeMood(currentMood, userEmotion, aiMood);
+      const finalMood = stabilizeMood(moodForPrompt, userEmotion, aiMood);
       const cleanReply = cleanBotReply(reply);
       userMoods.set(sender, finalMood);
       console.log(`Mood ${sender} berubah menjadi: ${finalMood}`);
+      console.log(`Self-respect ${sender}: ${relationshipState.stage} (${Math.round(relationshipState.tensionLevel || 0)}/100)`);
       console.log(`Balasan dibuat via ${generationResult.providerLabel} (${generationResult.model})`);
       history.push({
         role: "assistant",
