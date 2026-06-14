@@ -243,7 +243,9 @@ Muted: ${profile.muted ? "ya" : "tidak"}`;
 }
 
 function splitTargetAndValue(input = "") {
-  const parts = String(input || "").trim().split(/\s+/);
+  const parts = String(input || "")
+    .trim()
+    .split(/\s+/);
   if (parts.length < 2) return { target: "", value: "" };
   const value = parts.pop();
   return { target: parts.join(" "), value };

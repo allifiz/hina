@@ -175,7 +175,11 @@ async function connectToWhatsApp() {
       const userEmotion = detectUserEmotion(textBody || "gambar");
       const userIntent = mediaDescriptor?.kind === "image" ? "analisis_gambar" : detectIntent(textBody || "");
       const preferredProvider = selectReasoningRoute(textBody || "gambar", userIntent, userEmotion);
-      const userName = getDisplayName(sender, userProfiles.get(sender)?.name);
+      const oldName = userProfiles.get(sender)?.name;
+
+      const waName = msg.pushName || msg.verifiedBizName || msg.notifyName || oldName;
+
+      const userName = getDisplayName(sender, oldName && oldName !== "kakak" ? oldName : waName);
       const profile = updateUserProfile(sender, userEmotion, userIntent, textBody || `[${mediaDescriptor?.kind || "media"}]`, userName, extractNumberFromJid, isOwner);
       const relationshipState = updateRelationshipState(profile, textBody || "", {
         isPrivileged: isPrivilegedSender(sender),

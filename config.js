@@ -32,7 +32,9 @@ const QWEN_TTS_VOICE = getEnvValue("QWEN_TTS_VOICE") || "Cherry";
 const OWNER_NUMBER = normalizeNumber(getEnvValue("OWNER_NUMBER") || "6285894138868");
 const OWNER_NAME = getEnvValue("OWNER_NAME") || "Allif";
 const PARTNER_NUMBER = normalizeNumber(getEnvValue("PARTNER_NUMBER") || "628515901030");
-const PARTNER_NAME = getEnvValue("PARTNER_NAME") || "Sin";
+const PARTNER_NAME = getEnvValue("PARTNER_NAME") || "Sinta";
+const OWNER_LID = getEnvValue("OWNER_LID") || "124197653196846@lid";
+const PARTNER_LID = getEnvValue("PARTNER_LID") || "236549719511070@lid";
 
 // System settings
 const DB_FILE = "./database.json";
@@ -77,9 +79,7 @@ const OPENROUTER_AVAILABLE_MODELS = [
   "openrouter/owl-alpha",
 ].filter((model, index, models) => model && models.indexOf(model) === index);
 
-const QWEN_AVAILABLE_MODELS = [QWEN_MODEL_SMART, QWEN_MODEL_FALLBACK]
-  .filter(isTextChatModel)
-  .filter((model, index, models) => models.indexOf(model) === index);
+const QWEN_AVAILABLE_MODELS = [QWEN_MODEL_SMART, QWEN_MODEL_FALLBACK].filter(isTextChatModel).filter((model, index, models) => models.indexOf(model) === index);
 
 module.exports = {
   getEnvValue,
@@ -105,6 +105,8 @@ module.exports = {
   OWNER_NAME,
   PARTNER_NUMBER,
   PARTNER_NAME,
+  OWNER_LID,
+  PARTNER_LID,
   // System settings
   DB_FILE,
   FFMPEG_PATH,
