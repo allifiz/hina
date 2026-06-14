@@ -146,6 +146,12 @@ async function connectToWhatsApp() {
         console.log(`Transkrip audio dari ${sender}: ${textBody || "[kosong]"}`);
       }
 
+      const existingProfile = userProfiles.get(sender);
+      if (existingProfile?.banned && !isOwner(sender)) {
+        console.log(`[Ban] Pesan dari ${sender} diabaikan.`);
+        return;
+      }
+
       const lowerMsg = textBody.toLowerCase();
       if (
         textBody &&
@@ -159,7 +165,8 @@ async function connectToWhatsApp() {
           reminders,
           chatMemory,
           require("./config").PARTNER_NAME,
-          require("./config").OWNER_NAME
+          require("./config").OWNER_NAME,
+          saveDatabase
         ))
       )
         return;
