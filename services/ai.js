@@ -1,6 +1,8 @@
 const {
+  localClient,
   openRouterClient,
   qwenClient,
+  LOCAL_AVAILABLE_MODELS,
   OPENROUTER_AVAILABLE_MODELS,
   QWEN_AVAILABLE_MODELS,
   QWEN_MODEL_SMART,
@@ -9,6 +11,7 @@ const {
 const { extractTextContent, shouldSwitchModel, buildCompletionPayload } = require("../utils");
 
 let providerState = {
+  local: 0,
   openrouter: 0,
   qwen: 0,
 };
@@ -19,6 +22,16 @@ function isTextChatModel(model) {
 
 function getProviderCandidates() {
   const providers = [];
+
+  // Local llama.cpp is the default route for normal text chat.
+  if (localClient && LOCAL_AVAILABLE_MODELS.length > 0) {
+    providers.push({
+      name: "local",
+      label: "Local Huihui",
+      client: localClient,
+      models: LOCAL_AVAILABLE_MODELS,
+    });
+  }
 
   if (openRouterClient && OPENROUTER_AVAILABLE_MODELS.length > 0) {
     providers.push({
@@ -59,16 +72,28 @@ function selectReasoningRoute(text, userIntent, userEmotion) {
   const emotionalHeavy = ["sedih", "capek", "cemas", "kesepian", "marah"].includes(userEmotion);
   const asksDeepAdvice = /aku harus gimana|baiknya gimana|pilih mana|saran serius|nasihat|langkah demi langkah/.test(msg);
 
-  if (userIntent === "live_info") return "openrouter";
-  if (userIntent === "short_reply") return "openrouter";
-  if (userIntent === "ngobrol") return "openrouter";
-  if (userIntent === "bertanya" && msg.length < 180) return "openrouter";
+  // Live info still prefers a cloud model because the request may depend on fresh RAG context.
+  // If cloud providers are unavailable, the normal fallback chain can still use local.
+  if (userIntent === "live_info" && openRouterClient) return "openrouter";
+
+  // Normal conversations are intentionally local-first.
+  if (localClient) {
+    if (userIntent === "short_reply") return "local";
+    if (userIntent === "ngobrol") return "local";
+    if (userIntent === "bertanya") return "local";
+    if (userIntent === "minta_bantuan") return "local";
+    if (userIntent === "set_reminder") return "local";
+    if (userIntent === "curhat" && !longText && !emotionalHeavy && !asksDeepAdvice) return "local";
+  }
 
   if (qwenClient && (longText || emotionalHeavy || asksDeepAdvice || userIntent === "curhat")) {
     return "qwen";
   }
 
-  return "openrouter";
+  if (openRouterClient) return "openrouter";
+  if (localClient) return "local";
+  if (qwenClient) return "qwen";
+  return null;
 }
 
 function getQwenModelOrder(text, userIntent, userEmotion) {
@@ -101,6 +126,46 @@ function getProviderCandidatesForRoute(preferredProvider, text, userIntent, user
   return [...providers.filter((provider) => provider.name === preferredProvider), ...providers.filter((provider) => provider.name !== preferredProvider)];
 }
 
+function prepareMessagesForProvider(messages, providerName) {
+  if (providerName !== "local") return messages;
+
+  let hasSystemMessage = false;
+  const prepared = messages.map((message) => {
+    if (message.role !== "system") return message;
+    hasSystemMessage = true;
+    const content = String(message.content || "");
+    if (/\/no_think\b/i.test(content)) return message;
+    return {
+      ...message,
+      content: `${content.trim()}\n\n/no_think`,
+    };
+  });
+
+  if (!hasSystemMessage) {
+    prepared.unshift({
+      role: "system",
+      content: "/no_think",
+    });
+  }
+
+  return prepared;
+}
+
+function buildPayloadForProvider(provider, model, messages, userIntent) {
+  const payload = buildCompletionPayload(model, prepareMessagesForProvider(messages, provider.name), userIntent);
+
+  if (provider.name === "local") {
+    // Qwen3/Huihui still responds best to /no_think. These hints are harmless on
+    // llama.cpp versions that support them and the text marker remains the fallback.
+    payload.chat_template_kwargs = {
+      enable_thinking: false,
+    };
+    payload.reasoning_effort = "none";
+  }
+
+  return payload;
+}
+
 async function getReplyFromProviders(messages, userIntent, preferredProvider, rawUserText, userEmotion) {
   const providers = getProviderCandidatesForRoute(preferredProvider, rawUserText, userIntent, userEmotion);
   const failures = [];
@@ -110,14 +175,15 @@ async function getReplyFromProviders(messages, userIntent, preferredProvider, ra
       const index = (startIndex + offset) % provider.models.length;
       const currentModel = provider.models[index];
       try {
-        const response = await provider.client.chat.completions.create(buildCompletionPayload(currentModel, messages, userIntent));
+        const payload = buildPayloadForProvider(provider, currentModel, messages, userIntent);
+        const response = await provider.client.chat.completions.create(payload);
         const rawReply = extractTextContent(response?.choices?.[0]?.message?.content);
         if (!rawReply) {
           console.warn(`[${provider.label}] Model '${currentModel}' mengembalikan balasan kosong. Coba sekali lagi di model yang sama...`);
           failures.push(`${provider.label}:${currentModel}:empty`);
 
           try {
-            const retryResponse = await provider.client.chat.completions.create(buildCompletionPayload(currentModel, messages, userIntent));
+            const retryResponse = await provider.client.chat.completions.create(payload);
             const retryReply = extractTextContent(retryResponse?.choices?.[0]?.message?.content);
 
             if (retryReply) {
