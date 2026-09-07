@@ -49,6 +49,13 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function stripReasoningTags(text) {
+  return String(text || "")
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
+    .trim();
+}
+
 function extractTextContent(content) {
   if (typeof content === "string") return content.trim();
   if (Array.isArray(content)) {
@@ -68,7 +75,8 @@ function shouldSwitchModel(error) {
   if (!error) return false;
   const status = error.status || error.statusCode || error.response?.status;
   const message = String(error.message || error.response?.data?.message || error.response?.data?.code || "").toLowerCase();
-  const code = String(error.code || "").toLowerCase();
+  const code = String(error.code || error.cause?.code || "").toLowerCase();
+  const name = String(error.name || "").toLowerCase();
   return (
     status === 429 ||
     status === 402 ||
@@ -87,12 +95,17 @@ function shouldSwitchModel(error) {
     message.includes("invalid model") ||
     message.includes("timeout") ||
     message.includes("timed out") ||
+    message.includes("connection error") ||
+    message.includes("connect") ||
     code.includes("quota") ||
     code.includes("arrearage") ||
     code.includes("timeout") ||
     code.includes("etimedout") ||
     code.includes("econnreset") ||
-    code.includes("econnaborted")
+    code.includes("econnaborted") ||
+    code.includes("econnrefused") ||
+    code.includes("enotfound") ||
+    name.includes("apiconnectionerror")
   );
 }
 
@@ -119,7 +132,7 @@ function getReadableError(error) {
 }
 
 function extractMoodAndCleanReply(text) {
-  const raw = String(text || "");
+  const raw = stripReasoningTags(text);
   let match = raw.match(/^\s*\[mood:\s*([a-z]+)\]\s*([\s\S]*)$/i);
   if (match && VALID_MOODS.includes(match[1].toLowerCase()))
     return {
@@ -159,7 +172,7 @@ function stabilizeMood(previousMood, detectedEmotion, aiMood) {
 function cleanBotReply(reply) {
   if (!reply) return "Aku bingung jawabnya, kak ;w;";
 
-  const cleaned = String(reply)
+  const cleaned = stripReasoningTags(reply)
     // hapus tag mood/moodle di mana pun
     .replace(/\[(mood|moodle)\s*:\s*[^\]]+\]/gi, "")
 
@@ -291,6 +304,7 @@ module.exports = {
   getDisplayName,
   getTimeContext,
   sleep,
+  stripReasoningTags,
   extractTextContent,
   shouldSwitchModel,
   buildCompletionPayload,
