@@ -19,6 +19,12 @@ const OPENROUTER_MODELS = getEnvValue("OPENROUTER_MODELS");
 const QWEN_API_KEY = getEnvValue("QWEN_API_KEY");
 const TAVILY_API_KEY = getEnvValue("TAVILY_API_KEY");
 
+// Local llama.cpp / OpenAI-compatible server
+const LOCAL_MODEL_ENABLED = getEnvValue("LOCAL_MODEL_ENABLED").toLowerCase() !== "false";
+const LOCAL_MODEL_BASE_URL = getEnvValue("LOCAL_MODEL_BASE_URL") || "http://127.0.0.1:8080/v1";
+const LOCAL_MODEL_NAME = getEnvValue("LOCAL_MODEL_NAME") || "local-model";
+const LOCAL_MODEL_API_KEY = getEnvValue("LOCAL_MODEL_API_KEY") || "local";
+
 // Models
 const QWEN_MODEL_SMART = getEnvValue("QWEN_MODEL_SMART") || "qwen3.7-plus";
 const QWEN_MODEL_FALLBACK = getEnvValue("QWEN_MODEL_FALLBACK") || "qwen3.6-flash";
@@ -44,20 +50,31 @@ const MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_HISTORY = 10;
 const VALID_MOODS = ["ceria", "senang", "marah", "sedih", "cemburu", "malu", "mengantuk", "biasa", "kesal"];
 
-if (!OPENROUTER_API_KEY) {
-  console.error("OPENROUTER_API_KEY belum ada di .env");
+if (!LOCAL_MODEL_ENABLED && !OPENROUTER_API_KEY && !QWEN_API_KEY) {
+  console.error("Tidak ada provider AI aktif. Aktifkan LOCAL_MODEL_ENABLED atau isi API key provider cloud di .env");
   process.exit(1);
 }
 
-// Initialize OpenAI clients
-const openRouterClient = new OpenAI({
-  apiKey: OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-  defaultHeaders: {
-    "HTTP-Referer": OPENROUTER_SITE_URL,
-    "X-Title": OPENROUTER_APP_NAME,
-  },
-});
+// Initialize OpenAI-compatible clients
+const localClient = LOCAL_MODEL_ENABLED
+  ? new OpenAI({
+      apiKey: LOCAL_MODEL_API_KEY,
+      baseURL: LOCAL_MODEL_BASE_URL,
+      timeout: 120000,
+      maxRetries: 0,
+    })
+  : null;
+
+const openRouterClient = OPENROUTER_API_KEY
+  ? new OpenAI({
+      apiKey: OPENROUTER_API_KEY,
+      baseURL: "https://openrouter.ai/api/v1",
+      defaultHeaders: {
+        "HTTP-Referer": OPENROUTER_SITE_URL,
+        "X-Title": OPENROUTER_APP_NAME,
+      },
+    })
+  : null;
 
 const qwenClient = QWEN_API_KEY
   ? new OpenAI({
@@ -70,6 +87,8 @@ const qwenClient = QWEN_API_KEY
 function isTextChatModel(model) {
   return model && !/(^|[-_])vl([-_]|$)|vision/i.test(String(model || ""));
 }
+
+const LOCAL_AVAILABLE_MODELS = LOCAL_MODEL_ENABLED && LOCAL_MODEL_NAME ? [LOCAL_MODEL_NAME] : [];
 
 const OPENROUTER_AVAILABLE_MODELS = [
   ...OPENROUTER_MODELS.split(",")
@@ -92,6 +111,11 @@ module.exports = {
   OPENROUTER_MODELS,
   QWEN_API_KEY,
   TAVILY_API_KEY,
+  // Local model
+  LOCAL_MODEL_ENABLED,
+  LOCAL_MODEL_BASE_URL,
+  LOCAL_MODEL_NAME,
+  LOCAL_MODEL_API_KEY,
   // Models
   QWEN_MODEL_SMART,
   QWEN_MODEL_FALLBACK,
@@ -115,8 +139,10 @@ module.exports = {
   MAX_HISTORY,
   VALID_MOODS,
   // Clients
+  localClient,
   openRouterClient,
   qwenClient,
+  LOCAL_AVAILABLE_MODELS,
   OPENROUTER_AVAILABLE_MODELS,
   QWEN_AVAILABLE_MODELS,
 };
