@@ -18,15 +18,41 @@ function getUserProfile(sender, fallbackName, extractNumberFromJid, isOwner) {
       lastEmotion: "netral",
       lastIntent: "ngobrol",
       lastTopic: null,
+      adultMode: false,
+      ageVerified18Plus: false,
+      flirtLevel: 0,
       lastInteractionAt: Date.now(),
       createdAt: Date.now(),
     });
   }
-  return userProfiles.get(sender);
+  const profile = userProfiles.get(sender);
+  if (typeof profile.adultMode !== "boolean") profile.adultMode = false;
+  if (typeof profile.ageVerified18Plus !== "boolean") profile.ageVerified18Plus = false;
+  if (!Number.isInteger(profile.flirtLevel)) profile.flirtLevel = 0;
+  return profile;
+}
+
+function applyAdultModeCommand(profile, text) {
+  const msg = String(text || "").toLowerCase().trim();
+  if (/^\/adult\s+(on|18\+)$/.test(msg)) {
+    profile.ageVerified18Plus = true;
+    profile.adultMode = true;
+    profile.flirtLevel = Math.max(profile.flirtLevel || 0, 2);
+  } else if (/^\/adult\s+off$/.test(msg)) {
+    profile.adultMode = false;
+    profile.flirtLevel = 0;
+  } else {
+    const level = msg.match(/^\/adult\s+level\s+([0-3])$/);
+    if (level && profile.ageVerified18Plus) {
+      profile.flirtLevel = Number(level[1]);
+      profile.adultMode = profile.flirtLevel > 0;
+    }
+  }
 }
 
 function updateUserProfile(sender, emotion, intent, text, fallbackName, extractNumberFromJid, isOwner) {
   const profile = getUserProfile(sender, fallbackName, extractNumberFromJid, isOwner);
+  applyAdultModeCommand(profile, text);
   profile.messageCount += 1;
   profile.lastEmotion = emotion;
   profile.lastIntent = intent;
@@ -44,9 +70,7 @@ function loadDatabase() {
   if (!fs.existsSync(DB_FILE)) return;
   try {
     const parsed = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-    for (const [jid, profile] of Object.entries(parsed.userProfiles || {})) {
-      userProfiles.set(jid, profile);
-    }
+    for (const [jid, profile] of Object.entries(parsed.userProfiles || {})) userProfiles.set(jid, profile);
     reminders = Array.isArray(parsed.reminders) ? parsed.reminders : [];
     console.log(`[DB] Memuat ${userProfiles.size} profil dan ${reminders.length} reminder.`);
   } catch (error) {
@@ -56,17 +80,7 @@ function loadDatabase() {
 
 function saveDatabase() {
   try {
-    fs.writeFileSync(
-      DB_FILE,
-      JSON.stringify(
-        {
-          userProfiles: Object.fromEntries(userProfiles),
-          reminders,
-        },
-        null,
-        2
-      )
-    );
+    fs.writeFileSync(DB_FILE, JSON.stringify({ userProfiles: Object.fromEntries(userProfiles), reminders }, null, 2));
   } catch (error) {
     console.error("[DB] Gagal menyimpan database:", error.message);
   }
@@ -80,8 +94,6 @@ module.exports = {
   updateUserProfile,
   loadDatabase,
   saveDatabase,
-  setReminders: (arr) => {
-    reminders = arr;
-  },
+  setReminders: (arr) => { reminders = arr; },
   getReminders: () => reminders,
 };
