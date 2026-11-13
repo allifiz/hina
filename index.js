@@ -579,23 +579,7 @@ async function connectToWhatsApp() {
       const messages = [
         {
           role: "system",
-          content:
-            getHinaPersona({
-              currentMood: moodForPrompt,
-              userName,
-              isCreator: isOwner(sender),
-              userEmotion,
-              userIntent,
-              userText: textBody,
-              timeContext: getTimeContext(),
-              relationshipMode,
-              relationshipState,
-              relationshipContext,
-              profile,
-              isOwner,
-              OWNER_NAME: require("./config").OWNER_NAME,
-              PARTNER_NAME: require("./config").PARTNER_NAME,
-            }) && composeCognitiveContext({
+          content: composeCognitiveContext({
               persona:getHinaPersona({
                 currentMood:moodForPrompt,userName,isCreator:isOwner(sender),
                 userEmotion,userIntent,userText:textBody,timeContext:getTimeContext(),
