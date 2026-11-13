@@ -28,6 +28,7 @@ jobs:
             DEPLOY_BACKUP="$(mktemp -d "$HOME/hina-backups/deploy-XXXXXXXX")"
             [ ! -f .env ] || cp -p .env "$DEPLOY_BACKUP/.env"
             [ ! -f database.json ] || cp -p database.json "$DEPLOY_BACKUP/database.json"
+            [ ! -f "$HOME/hina-data/database.json" ] || cp -p "$HOME/hina-data/database.json" "$DEPLOY_BACKUP/database-external.json"
             [ ! -d auth_info_baileys ] || cp -a auth_info_baileys "$DEPLOY_BACKUP/auth_info_baileys"
 
             echo "Pulling latest main..."
@@ -48,6 +49,14 @@ jobs:
 
             echo "Restarting Hina service..."
             sudo -n systemctl restart hina
+
+            echo "Waiting for app startup..."
+            sleep 8
+            if ! sudo -n systemctl is-active --quiet hina; then
+              echo "Hina stopped after deployment. Recent journal:"
+              sudo -n journalctl -u hina -n 40 --no-pager || true
+              exit 1
+            fi
 
             echo "Checking service status..."
             sudo -n systemctl status hina --no-pager

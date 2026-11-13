@@ -1,6 +1,6 @@
 const {
   nineRouterClient,
-  NINEROUTER_MODEL,
+  NINEROUTER_AVAILABLE_MODELS,
   localClient,
   openRouterClient,
   qwenClient,
@@ -11,6 +11,8 @@ const {
   QWEN_MODEL_FALLBACK,
 } = require("../config");
 const { extractTextContent, shouldSwitchModel, buildCompletionPayload } = require("../utils");
+
+const modelCooldowns = new Map();
 
 let providerState = {
   ninerouter: 0,
@@ -27,12 +29,12 @@ function getProviderCandidates() {
   const providers = [];
 
   // 9Router first: route text chat to the already-tested local proxy.
-  if (nineRouterClient && NINEROUTER_MODEL) {
+  if (nineRouterClient && NINEROUTER_AVAILABLE_MODELS.length > 0) {
     providers.push({
       name: "ninerouter",
       label: "9Router",
       client: nineRouterClient,
-      models: [NINEROUTER_MODEL],
+      models: NINEROUTER_AVAILABLE_MODELS,
     });
   }
 
@@ -71,8 +73,7 @@ function getPrimaryRouteLabel() {
   const providers = getProviderCandidates();
   if (providers.length === 0) return "tidak ada model aktif";
   const provider = providers[0];
-  const currentIndex = providerState[provider.name] || 0;
-  const model = provider.models[currentIndex] || provider.models[0];
+  const model = provider.models[0]; // Always show the configured primary, not the last fallback.
   return `${provider.label} -> ${model}`;
 }
 
@@ -192,14 +193,26 @@ function buildPayloadForProvider(provider, model, messages, userIntent) {
   return payload;
 }
 
+function getModelCooldownMs(error) {
+  const status = Number(error?.status || error?.statusCode || error?.response?.status || 0);
+  if (status === 429 || status === 402) return 30 * 60 * 1000;
+  if (status === 403 || status === 404) return 60 * 60 * 1000;
+  return 0;
+}
+
 async function getReplyFromProviders(messages, userIntent, preferredProvider, rawUserText, userEmotion) {
   const providers = getProviderCandidatesForRoute(preferredProvider, rawUserText, userIntent, userEmotion);
   const failures = [];
   for (const provider of providers) {
-    const startIndex = providerState[provider.name] || 0;
+    const startIndex = provider.name === "ninerouter" ? 0 : (providerState[provider.name] || 0);
     for (let offset = 0; offset < provider.models.length; offset++) {
       const index = (startIndex + offset) % provider.models.length;
       const currentModel = provider.models[index];
+      const cooldownKey = provider.name + ":" + currentModel;
+      if (provider.name === "ninerouter" && (modelCooldowns.get(cooldownKey) || 0) > Date.now()) {
+        failures.push(provider.label + ":" + currentModel + ":cooldown");
+        continue;
+      }
       try {
         const payload = buildPayloadForProvider(provider, currentModel, messages, userIntent);
         const response = await provider.client.chat.completions.create(payload);
@@ -227,13 +240,16 @@ async function getReplyFromProviders(messages, userIntent, preferredProvider, ra
           continue;
         }
         providerState[provider.name] = index;
+        modelCooldowns.delete(cooldownKey);
         return {
           rawReply,
           providerLabel: provider.label,
           model: currentModel,
         };
       } catch (error) {
-        if (shouldSwitchModel(error)) {
+        if (shouldSwitchModel(error) || Number(error?.status || error?.statusCode) === 403) {
+          const cooldown = provider.name === "ninerouter" ? getModelCooldownMs(error) : 0;
+          if (cooldown) modelCooldowns.set(cooldownKey, Date.now() + cooldown);
           const reason = error.status || error.statusCode || error.code || error.message;
           console.warn(`[${provider.label}] Model '${currentModel}' gagal (${reason}). Beralih...`);
           failures.push(`${provider.label}:${currentModel}:${reason}`);
@@ -255,4 +271,5 @@ module.exports = {
   selectReasoningRoute,
   getReplyFromProviders,
   getProviderState: () => providerState,
+  getModelCooldowns: () => new Map(modelCooldowns),
 };
