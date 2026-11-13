@@ -7,6 +7,7 @@ const { DB_FILE } = require("../config");
 const { getWibClock } = require("./temporal");
 const { CHARACTER } = require("./character-core");
 const { initialMotivation, normalizeMotivation, decideActivity, applyMotivation, getMotivationContext } = require("./motivation");
+const { initialBeliefState, normalizeBeliefState, reflectOnExperience, getBeliefContext, getBeliefSummary } = require("./belief-value");
 
 const LIFE_FILE = process.env.HINA_LIFE_FILE || DB_FILE + ".life.json";
 const MAX_EVENTS = 90;
@@ -24,6 +25,7 @@ function seedState(now = Date.now()) {
     lastTickAt: now,
     paused: false,
     beliefs: CHARACTER.values.slice(),
+    beliefState: initialBeliefState(),
     motivation: initialMotivation(),
     interests: Object.fromEntries(INTEREST_KEYS.map((key) => [key, { affinity: 1, explored: 0, level: 0 }])),
     experiences: [],
@@ -44,6 +46,7 @@ function loadLifeState(now = Date.now(), file = LIFE_FILE) {
           ...parsed,
           interests: { ...fallback.interests, ...parsed.interests },
           beliefs: fallback.beliefs,
+          beliefState: normalizeBeliefState(parsed.beliefState),
           motivation: normalizeMotivation(parsed.motivation), // Stable character values are not user-editable chat data.
           experiences: parsed.experiences.filter((x) => x && typeof x === "object" && Number.isFinite(x.at)).slice(-MAX_EVENTS),
           milestones: Array.isArray(parsed.milestones) ? parsed.milestones.slice(-40) : [],
@@ -124,6 +127,7 @@ function applyExperience(current, scheduledAt, dateKey, slotIndex) {
   applyMotivation(current, decision);
   current.experiences.push(event);
   current.experiences = current.experiences.slice(-MAX_EVENTS);
+  reflectOnExperience(current, event);
   if (level > oldLevel) {
     current.milestones.push({
       at: scheduledAt,
@@ -177,7 +181,7 @@ function setLifePaused(paused, now = Date.now(), file = LIFE_FILE) {
   return current.paused;
 }
 
-function getLifeContext(now = Date.now(), file = LIFE_FILE) {
+function getLifeContext(now = Date.now(), file = LIFE_FILE, userText = "") {
   const current = getLifeState(now, file);
   const recent = current.experiences.slice(-3);
   const interests = INTEREST_KEYS
@@ -189,6 +193,7 @@ function getLifeContext(now = Date.now(), file = LIFE_FILE) {
     "Identitas: Hina, gadis karakter 21 tahun, Sunda, dari Pameungpeuk Garut; ceria, penasaran, kadang pemalu, jahil, mandiri, dan manja.",
     "Nilai dasar: " + current.beliefs.join("; ") + ".",
     getMotivationContext(current),
+    getBeliefContext(current, userText),
     "Ketertarikan: " + interests.map((i) => CHARACTER.interests[i.key].name +
       " (pengalaman " + i.explored + ", perkembangan " + i.level + "/4)").join("; ") + ".",
     "Catatan refleksi yang BENAR-BENAR dijalankan oleh sistem simulasi:",
@@ -211,6 +216,7 @@ function getLifeSummary(now = Date.now(), file = LIFE_FILE) {
     "Pengalaman: " + current.experiences.length,
     "Milestone: " + current.milestones.length,
     "Keputusan simulasi: " + normalizeMotivation(current.motivation).decisions,
+    getBeliefSummary(current),
     "Terakhir: " + (latest ? getWibClock(latest.at).formatted +
       " | " + CHARACTER.interests[latest.interest].name + " | " + latest.activity : "belum ada"),
   ].join("\n");
