@@ -48,6 +48,7 @@ const { detectUserEmotion, detectIntent, getInstantReply, getRelationshipMode, g
 const { updateRelationshipState, getRelationshipContext, shouldUseInstantReply } = require("./services/relationship");
 const { getHinaReplyStyle } = require("./services/persona");
 const { resolveHinaMood } = require("./services/mood");
+const { getReconnectDelay } = require("./services/connection-retry");
 
 // Handlers
 const { startReminderService, startProactiveMessaging, handleOwnerCommands } = require("./handlers/services");
@@ -59,6 +60,30 @@ const chatMemory = chatHistories; // Persisted in DB_FILE, including after proce
 const userMoods = new Map();
 let reminders = null;
 let isServicesStarted = false;
+let activeSocket = null;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+
+// Timer callbacks must always use the current socket after a WhatsApp reconnect.
+const serviceSocket = {
+  sendMessage: (...args) => {
+    if (!activeSocket) throw new Error("WhatsApp sedang tidak terkoneksi");
+    return activeSocket.sendMessage(...args);
+  },
+};
+
+function scheduleReconnect(reason = "connection closed") {
+  if (reconnectTimer) return;
+  const delay = getReconnectDelay(reconnectAttempts++);
+  console.warn(`[Connection] ${reason}. Coba sambung lagi dalam ${Math.round(delay / 1000)} detik.`);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connectToWhatsApp().catch((error) => {
+      console.error("[Connection] Gagal membuat koneksi baru:", error.message || error);
+      scheduleReconnect("startup failed");
+    });
+  }, delay);
+}
 
 function isPrivilegedSender(sender) {
   const number = extractNumberFromJid(sender);
@@ -89,23 +114,35 @@ async function connectToWhatsApp() {
     shouldSyncHistoryMessage: ({ syncType }) => syncType !== 2,
   });
 
+  activeSocket = sock;
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", async (update) => {
+    // Ignore late close/open events belonging to an old socket.
+    if (sock !== activeSocket) return;
     const { connection, lastDisconnect, qr } = update;
     if (qr)
       qrcode.generate(qr, {
         small: true,
       });
     if (connection === "close") {
+      activeSocket = null;
       const statusCode = lastDisconnect?.error instanceof Boom ? lastDisconnect.error.output?.statusCode : null;
-      if (statusCode !== DisconnectReason.loggedOut) connectToWhatsApp();
-      else console.log("[Connection] WhatsApp session invalid (401). Pair again with a new QR; do not auto-retry the same credentials.");
+      if (statusCode !== DisconnectReason.loggedOut) {
+        scheduleReconnect("WhatsApp disconnected" + (statusCode ? " (" + statusCode + ")" : ""));
+      } else {
+        console.error("[Connection] WhatsApp session invalid (401). Pair again with a new QR; do not auto-retry the same credentials.");
+      }
     } else if (connection === "open") {
+      reconnectAttempts = 0;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
       console.log(`Mantap! Bot WhatsApp (Hina Baileys) sudah aktif. Rute utama: ${getPrimaryRouteLabel()}`);
       if (!isServicesStarted) {
-        startReminderService(sock, reminders, saveDatabase);
-        startProactiveMessaging(sock, userProfiles, saveDatabase);
+        startReminderService(serviceSocket, reminders, saveDatabase);
+        startProactiveMessaging(serviceSocket, userProfiles, saveDatabase);
         isServicesStarted = true;
         console.log("[System] Reminder dan proactive messaging aktif.");
       }
@@ -113,6 +150,7 @@ async function connectToWhatsApp() {
   });
 
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
+    if (sock !== activeSocket) return;
     if (type !== "notify") return;
     const msg = messages[0];
     if (!msg?.message || msg.key.fromMe || msg.key.remoteJid?.endsWith("@g.us")) return;
@@ -329,4 +367,7 @@ async function connectToWhatsApp() {
 
 loadDatabase();
 reminders = getReminders();
-connectToWhatsApp();
+connectToWhatsApp().catch((error) => {
+  console.error("[Connection] Initial connection failed:", error.message || error);
+  scheduleReconnect("initial connection failed");
+});
