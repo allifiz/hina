@@ -83,7 +83,7 @@ test("V4 persona has consistent fictional life and natural slang without robotic
 
 test("news style stays grounded but uses ordinary WhatsApp conversation", () => {
   const persona = getHinaPersona({ ...base, userIntent: "live_info", userText: "berita apa hari ini?" });
-  assert.match(persona, /bukan pembaca berita/);
+  assert.match(persona, /Jangan berubah jadi pembaca berita/);
   assert.match(persona, /tanggal terbit, dan tanggal kejadian/);
   assert.match(persona, /jawaban lama Hina yang mengaku browsing belum aktif/);
 });
