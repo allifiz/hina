@@ -4,6 +4,7 @@ const { getPrimaryRouteLabel } = require("../services/ai");
 const { getLiveInfoCache, getWebInfoCache, clearCaches } = require("../services/web");
 const { isOwner } = require("../utils");
 const { getLifeState } = require("../services/life-simulation");
+const { forgetTerm } = require("../services/language-learning");
 const { forgetEpisode } = require("../services/episodic-memory");
 const { eligibleForProactive, chooseProactiveMessage, updateProactiveAfterSend } = require("../services/proactive-policy");
 const { memoryNotes, getMemoryNotes, rememberUserNote, forgetUserNotes } = require("../services/database");
@@ -334,10 +335,14 @@ async function handleOwnerCommands(sock, sender, lowerMsg, textBody, userMoods, 
     chatMemory.delete(sender);
     memoryNotes.delete(sender);
     forgetEpisode(sender, "semua");
+    forgetTerm(sender, "semua");
     const profile = userProfiles.get(sender);
-    if (profile) profile.episodeAutoOptIn = false;
+    if (profile) {
+      profile.episodeAutoOptIn = false;
+      profile.languageAutoOptIn = false;
+    }
     saveDatabase();
-    await replyText(sock, sender, "Riwayat chat, memori, dan catatan episodikmu sudah aku hapus. Profil dan reminder tetap ada yaa :3");
+    await replyText(sock, sender, "Riwayat chat, memori episodik, dan kosakata pribadi sudah aku hapus. Profil dan reminder tetap ada yaa :3");
     return true;
   }
   if (lowerMsg === "/help") {
@@ -345,7 +350,7 @@ async function handleOwnerCommands(sock, sender, lowerMsg, textBody, userMoods, 
       sock,
       sender,
       `Command Hina:
-Public: /help, /owner, /ingat [catatan], /lupa kata-kunci|semua, /resetme, /mood, /stats, /vn teks
+Public: /help, /owner, /ingat [catatan], /lupa kata-kunci|semua, /episode, /bahasa, /proactive, /resetme, /mood, /stats, /vn teks
 Owner: /status, /model, /ragcache, /clearcache, /userinfo, /users, /resetrel, /setrespect, /settension, /setstage, /setname, /ban, /unban, /reminders, /clearreminders`
     );
     return true;
