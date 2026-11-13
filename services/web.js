@@ -35,11 +35,22 @@ function needsGeneralWebInfo(text) {
   if (/https?:\/\/[^\s]+/i.test(msg)) return true;
 
   return (
-    /\b(cari|carikan|cariin|search|googling|web|internet|sumber|referensi)\b/.test(msg) ||
+    /\b(cari|carikan|cariin|search|googling|browse|browsing|web|internet|sumber|referensi)\b/.test(msg) ||
     /\b(versi terbaru|rilis terbaru|update terbaru|harga sekarang|jadwal terbaru|aturan terbaru|apakah masih|masih berlaku)\b/.test(msg) ||
     (/\b(error|bug|issue|library|framework|package|npm|node|baileys|openrouter|qwen|api)\b/.test(msg) && /\b(terbaru|sekarang|cara|fix|solusi)\b/.test(msg)) ||
     isHealthTopic(msg)
   );
+}
+
+// "coba search" is a request to test/search, but has no subject yet.
+// Ask what to find instead of searching for the filler word "coba".
+function isBareSearchRequest(text) {
+  const input = String(text || "").toLowerCase()
+    .replace(/[,.!?]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^(?:(?:hina|hin|na)\s+)+/, "");
+  return /^(?:(?:coba|tolong|bisa|boleh)\s+){0,3}(?:search|cari|carikan|cariin|googling|browse|browsing)(?:\s+(?:dong|deh|ya|nih|dulu|aja))*$/.test(input);
 }
 
 function getRagMode(text) {
@@ -61,7 +72,7 @@ function extractLiveSearchQuery(text) {
 
   let cleaned = raw
     .replace(/\bhina\b/g, "")
-    .replace(/\b(cariin|carikan|cari|kasih|beritain|jelasin|info|update|tentang|dong|ya|nih)\b/g, "")
+    .replace(/\b(coba|search|browse|browsing|googling|cariin|carikan|cari|kasih|beritain|jelasin|info|update|tentang|dong|ya|nih)\b/g, "")
     .replace(/\b(berita|news|terbaru|terkini|hari ini|sekarang|viral|trending|hangat|isu)\b/g, "")
     .replace(/[?!.]/g, " ")
     .replace(/\s+/g, " ")
@@ -85,7 +96,7 @@ function extractWebSearchQuery(text) {
   return (
     raw
       .replace(/\bhina\b/gi, "")
-      .replace(/\b(cariin|carikan|cari|search|googling|di web|di internet|dong|ya|nih)\b/gi, "")
+      .replace(/\b(coba|cariin|carikan|cari|search|googling|browsing|browse|di web|di internet|dong|ya|nih)\b/gi, "")
       .replace(/\s+/g, " ")
       .trim() || raw
   );
@@ -153,6 +164,7 @@ async function getLatestNewsContext(text) {
     try {
       const result = await search9Router(query, { news: true, maxResults: 5 });
       if (result?.length) {
+        console.info(`[RAG_9ROUTER_NEWS] Berhasil: ${result.length} hasil dari Antigravity.`);
         const context = makeSearchContext(result, { query, news: true });
         liveInfoCache.set(cacheKey, { time: Date.now(), context });
         return context;
@@ -240,10 +252,14 @@ async function getWebSearchContext(text) {
     }
   }
 
+  let searchAttempted = false;
+  let searchFailed = false;
   if (is9RouterSearchConfigured()) {
+    searchAttempted = true;
     try {
       const results = await search9Router(query, { maxResults: 5 });
       if (results?.length) {
+        console.info(`[RAG_9ROUTER_WEB] Berhasil: ${results.length} hasil dari Antigravity.`);
         let article = null;
         if (is9RouterFetchConfigured() && /baca (artikel|berita)|lebih (detail|lengkap)|isi (artikel|berita)|ringkas (artikel|berita)/i.test(text)) {
           try {
@@ -257,19 +273,30 @@ async function getWebSearchContext(text) {
         return context;
       }
     } catch (error) {
+      searchFailed = true;
       console.warn("[RAG_9ROUTER_WEB] Pencarian gagal, memakai fallback lama:", error.message);
     }
   }
 
   if (!TAVILY_API_KEY) {
-    return `
+    return searchAttempted
+      ? `
 KONTEKS WEB UMUM:
-RAG web umum belum aktif karena TAVILY_API_KEY belum diisi.
+Antigravity Web Search sudah terkonfigurasi, tapi ${searchFailed ? "pencarian mengalami gangguan atau timeout" : "belum menemukan hasil yang cocok"} untuk permintaan ini.
+Waktu pemeriksaan: ${getJakartaTimestamp()}.
+
+ATURAN JAWAB:
+- Jelaskan bahwa pencarian kali ini belum berhasil, bukan bahwa akses web tidak aktif.
+- Jika belum ada hasil, minta topik/kata kunci yang lebih spesifik.
+- Jangan mengarang hasil atau mengaku sudah menemukan informasi terbaru.
+`
+      : `
+KONTEKS WEB UMUM:
+Belum ada provider pencarian web yang terkonfigurasi. Google News RSS mungkin masih tersedia untuk berita.
 
 ATURAN JAWAB:
 - Jangan pura-pura sudah mencari di web.
-- Jawab dari pengetahuan umum kalau aman.
-- Kalau butuh info terbaru, bilang bahwa akses web umum belum aktif.
+- Jawab dari pengetahuan umum bila sesuai; untuk fakta terbaru jelaskan keterbatasan.
 `;
   }
 
@@ -377,6 +404,8 @@ async function getRagContext(text, userIntent) {
 
 module.exports = {
   getRagMode,
+  isBareSearchRequest,
+  extractWebSearchQuery,
   getRagContext,
   getLiveInfoCache: () => liveInfoCache,
   getWebInfoCache: () => webInfoCache,
