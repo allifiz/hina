@@ -53,6 +53,8 @@ function loadLifeState(now = Date.now(), file = LIFE_FILE) {
         if (!fs.existsSync(file+".bak")) throw problem;
         console.warn(LOG_PREFIX,"State utama rusak, memulihkan salinan terakhir yang valid.");
         parsed = JSON.parse(fs.readFileSync(file+".bak","utf8"));
+        // Restore the good file before the next save rotates backups.
+        fs.copyFileSync(file+".bak",file);
       }
       if (parsed && parsed.version === 1 && Number.isFinite(parsed.createdAt) &&
           Array.isArray(parsed.experiences) && parsed.interests && typeof parsed.interests === "object") {
