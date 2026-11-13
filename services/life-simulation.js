@@ -10,6 +10,7 @@ const { initialMotivation, normalizeMotivation, decideActivity, applyMotivation,
 const { initialBeliefState, normalizeBeliefState, reflectOnExperience, getBeliefContext, getBeliefSummary } = require("./belief-value");
 const { freshGoalState, normalizeGoalState, reflectGoal, getGoalContext, getGoalSummary } = require("./character-growth");
 const { initialProjects, normalizeProjects, advanceProject, getCreativeContext, projectSummary, discoverWeekly } = require("./creative-projects");
+const { researchContext } = require("./project-research");
 
 const LIFE_FILE = process.env.HINA_LIFE_FILE || DB_FILE + ".life.json";
 const MAX_EVENTS = 90;
@@ -206,6 +207,7 @@ function getLifeContext(now = Date.now(), file = LIFE_FILE, userText = "") {
     getBeliefContext(current, userText),
     getGoalContext(current),
     getCreativeContext(current),
+    researchContext(current, now),
     "Ketertarikan: " + interests.map((i) => CHARACTER.interests[i.key].name +
       " (pengalaman " + i.explored + ", perkembangan " + i.level + "/4)").join("; ") + ".",
     "Catatan refleksi yang BENAR-BENAR dijalankan oleh sistem simulasi:",
