@@ -68,3 +68,23 @@ test("owner does not get a default kak address", () => {
   assert.match(prompt, /jangan panggil "kak" atau "kakak"/);
   assert.match(prompt, /Harap|sudah berharap|harapan yang tidak terwujud|kasian banget/i);
 });
+
+test("persona guards against fabricated details and awkward thanks for teasing", () => {
+  const { detectIntent, detectUserEmotion } = require("../services/persona");
+  const text = "aku baru ditolak kerja padahal udah berharap banget";
+  const supportive = getHinaPersona({
+    ...base,
+    userEmotion: detectUserEmotion(text),
+    userIntent: detectIntent(text),
+    userText: text,
+  });
+  assert.match(supportive, /Jangan mengarang lama waktu/);
+  assert.match(supportive, /durasi, usaha orang lain/);
+
+  const playful = getHinaPersona({
+    ...base,
+    userText: "ih kamu tuh nyebelin banget tau ga",
+  });
+  assert.match(playful, /jangan justru berterima kasih karena bikin orang kesal/);
+  assert.match(playful, /maksimal satu pertanyaan lanjutan/);
+});
