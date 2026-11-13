@@ -45,3 +45,24 @@ After review and merge, GitHub Actions on `main` will redeploy and restart `hina
 - No automatic way to guarantee a particular tone from GPT-OSS. The first test is prompt/routing logic only; human evaluation of real model replies is still needed.
 - Chat memory is currently in-process and not durable across restarts; this PR intentionally does not change persistence.
 - Voice notes, ASR/TTS, image, and WhatsApp authentication are unchanged.
+
+## Preview a multi-turn conversation
+
+Single-turn previews can miss awkward transitions. The new preview keeps assistant/user
+history and the evolving mood in memory for the duration of the command, without
+touching the live WhatsApp service or database.
+
+Fetch the latest PR branch inside the existing preview worktree, then run:
+
+```bash
+cd ~/bot-hina
+git fetch origin feat/hina-natural-persona-v2
+git -C ~/hina-persona-preview switch --detach origin/feat/hina-natural-persona-v2
+cd ~/hina-persona-preview
+node --test
+node scripts/preview-conversation.js "helo cantik" "ih kamu tuh nyebelin banget tau ga" "ahahah jangan ngambek dong" "hina, kalo kita jalan bareng kamu pengen kemana?"
+```
+
+Each turn calls 9Router once, and prior replies are sent back as context.
+The preview simulates the owner relationship. It is **not** a replacement for
+testing actual WhatsApp LID/relationship state and memory behavior.
