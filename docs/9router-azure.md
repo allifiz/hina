@@ -49,6 +49,45 @@ Then add `DB_FILE=/home/azureuser/hina-data/database.json` to the **server's** `
 
 4. Confirm 9Router still answers on `127.0.0.1:20128` from the VPS. Verify that the systemd service's user can read the Hina `.env`. Never paste API keys, WhatsApp credentials, or `systemctl cat` output containing secrets into chat.
 
+## WhatsApp session repair (November 13, 2026)
+
+The existing `hina.service` was looping on Baileys `DisconnectReason.loggedOut` (401), repeatedly reconnecting with invalid saved credentials. Its systemd `Restart=always` caused a persistent restart loop even when Node.js exited successfully.
+
+Before reconnecting, **stop the service**, preserving its auth folder and database:
+
+```bash
+sudo systemctl stop hina
+sudo systemctl reset-failed hina
+cd /home/azureuser/bot-hina
+umask 077
+BACKUP="$HOME/hina-backups/$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$BACKUP"
+cp -a .env database.json auth_info_baileys "$BACKUP/"
+chmod 600 .env
+chmod -R go-rwx auth_info_baileys "$BACKUP"
+```
+
+Reduce the risk of future 401 loops by configuring systemd to restart Hina on *failures* only, not successful logout exits. This override persists independently of Git deployments:
+
+```bash
+sudo mkdir -p /etc/systemd/system/hina.service.d
+printf '[Service]\nRestart=on-failure\n' | sudo tee /etc/systemd/system/hina.service.d/restart.conf
+sudo systemctl daemon-reload
+systemctl show hina -p Restart
+```
+
+Check **WhatsApp → Linked devices** on the phone. If Hina is unlinked, the old saved credentials cannot work. To safely force a new QR (after backing up), move the stale auth folder instead of deleting it:
+
+```bash
+cd /home/azureuser/bot-hina
+mv auth_info_baileys "$BACKUP/auth_info_baileys-stale"
+node index.js
+```
+
+The `auth_info_baileys-stale` destination must not already exist. QR appears directly in the interactive SSH terminal; scan from the phone's Linked devices screen. After `connection === open`, stop the manual process (Ctrl+C), then `sudo systemctl start hina`. Check status/logs and keep only one instance connected.
+
+This PR also changes `shouldSyncHistoryMessage`: do not blanket-disable initial LID mappings. It allows the essential small sync types but still excludes `FULL` history sync on low-RAM Azure.
+
 ## Test and deploy
 
 Run in a local checkout or the Azure deployment directory:
