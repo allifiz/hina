@@ -38,7 +38,7 @@ const {
 const { getProviderCandidates, getPrimaryRouteLabel, selectReasoningRoute, getReplyFromProviders } = require("./services/ai");
 
 // Web Services
-const { getRagMode, getRagContext } = require("./services/web");
+const { getRagMode, getRagContext, isBareSearchRequest } = require("./services/web");
 
 // Media Services
 const { downloadBaileysMedia, transcribeAudioWithQwen, analyzeIncomingImage, generateImageWithQwen } = require("./services/media");
@@ -259,6 +259,16 @@ async function connectToWhatsApp() {
       }
 
       if (!textBody) return;
+
+      if (isBareSearchRequest(textBody)) {
+        const answer = "bisaa dongg, mau aku cariin apa nih? :3";
+        appendChatMessage(sender, "user", textBody);
+        await replyWithPreferredFormat(sock, sender, answer, {
+          voiceReply: false,
+        });
+        appendChatMessage(sender, "assistant", answer);
+        return;
+      }
 
       const instantReply = getInstantReply(textBody, userName);
       if (instantReply && userIntent === "short_reply" && shouldUseInstantReply(relationshipState)) {
