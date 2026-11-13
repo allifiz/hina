@@ -46,7 +46,7 @@ const OWNER_LID = getEnvValue("OWNER_LID") || "124197653196846@lid";
 const PARTNER_LID = getEnvValue("PARTNER_LID") || "236549719511070@lid";
 
 // System settings
-const DB_FILE = "./database.json";
+const DB_FILE = getEnvValue("DB_FILE") || "./database.json";
 const FFMPEG_PATH = getEnvValue("FFMPEG_PATH");
 const MAX_IMAGE_SIZE_BYTES = 7 * 1024 * 1024;
 const MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024;
