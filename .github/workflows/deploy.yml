@@ -21,15 +21,30 @@ jobs:
 
             cd ${{ secrets.AZURE_APP_PATH }}
 
+            # Runtime files are not deploy artifacts. Back them up BEFORE git reset.
+            # database.json is still tracked by Git, so restore its live copy afterwards.
+            umask 077
+            mkdir -p "$HOME/hina-backups"
+            DEPLOY_BACKUP="$(mktemp -d "$HOME/hina-backups/deploy-XXXXXXXX")"
+            [ ! -f .env ] || cp -p .env "$DEPLOY_BACKUP/.env"
+            [ ! -f database.json ] || cp -p database.json "$DEPLOY_BACKUP/database.json"
+            [ ! -d auth_info_baileys ] || cp -a auth_info_baileys "$DEPLOY_BACKUP/auth_info_baileys"
+
             echo "Pulling latest main..."
             git fetch origin main
             git reset --hard origin/main
+            if [ -f "$DEPLOY_BACKUP/database.json" ]; then
+              cp -p "$DEPLOY_BACKUP/database.json" ./database.json
+            fi
 
             echo "Installing dependencies..."
             npm install --omit=dev
 
             echo "Checking syntax..."
             node --check index.js
+            node --check config.js
+            node --check services/ai.js
+            npm test
 
             echo "Restarting Hina service..."
             sudo -n systemctl restart hina

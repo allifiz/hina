@@ -72,7 +72,9 @@ async function connectToWhatsApp() {
     syncFullHistory: false,
     fireInitQueries: false,
     defaultQueryTimeoutMs: 120000,
-    shouldSyncHistoryMessage: () => false,
+    // Keep bootstrap/recent history for LID mappings; skip only full history on the small VPS.
+    // Baileys HistorySyncType.FULL = 2.
+    shouldSyncHistoryMessage: ({ syncType }) => syncType !== 2,
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -86,7 +88,7 @@ async function connectToWhatsApp() {
     if (connection === "close") {
       const statusCode = lastDisconnect?.error instanceof Boom ? lastDisconnect.error.output?.statusCode : null;
       if (statusCode !== DisconnectReason.loggedOut) connectToWhatsApp();
-      else console.log("[Connection] Logged out.");
+      else console.log("[Connection] WhatsApp session invalid (401). Pair again with a new QR; do not auto-retry the same credentials.");
     } else if (connection === "open") {
       console.log(`Mantap! Bot WhatsApp (Hina Baileys) sudah aktif. Rute utama: ${getPrimaryRouteLabel()}`);
       if (!isServicesStarted) {

@@ -17,6 +17,9 @@ const OPENROUTER_APP_NAME = getEnvValue("OPENROUTER_APP_NAME") || "WhatsApp Bot 
 const OPENROUTER_MODEL = getEnvValue("OPENROUTER_MODEL");
 const OPENROUTER_MODELS = getEnvValue("OPENROUTER_MODELS");
 const QWEN_API_KEY = getEnvValue("QWEN_API_KEY");
+const NINEROUTER_API_KEY = getEnvValue("NINEROUTER_API_KEY");
+const NINEROUTER_BASE_URL = getEnvValue("NINEROUTER_BASE_URL") || "http://127.0.0.1:20128/v1";
+const NINEROUTER_MODEL = getEnvValue("NINEROUTER_MODEL") || "ag/gpt-oss-120b-medium";
 const TAVILY_API_KEY = getEnvValue("TAVILY_API_KEY");
 
 // Local llama.cpp / OpenAI-compatible server
@@ -43,15 +46,15 @@ const OWNER_LID = getEnvValue("OWNER_LID") || "124197653196846@lid";
 const PARTNER_LID = getEnvValue("PARTNER_LID") || "236549719511070@lid";
 
 // System settings
-const DB_FILE = "./database.json";
+const DB_FILE = getEnvValue("DB_FILE") || "./database.json";
 const FFMPEG_PATH = getEnvValue("FFMPEG_PATH");
 const MAX_IMAGE_SIZE_BYTES = 7 * 1024 * 1024;
 const MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_HISTORY = 10;
 const VALID_MOODS = ["ceria", "senang", "marah", "sedih", "cemburu", "malu", "mengantuk", "biasa", "kesal"];
 
-if (!LOCAL_MODEL_ENABLED && !OPENROUTER_API_KEY && !QWEN_API_KEY) {
-  console.error("Tidak ada provider AI aktif. Aktifkan LOCAL_MODEL_ENABLED atau isi API key provider cloud di .env");
+if (!NINEROUTER_API_KEY && !LOCAL_MODEL_ENABLED && !OPENROUTER_API_KEY && !QWEN_API_KEY) {
+  console.error("Tidak ada provider AI aktif. Isi NINEROUTER_API_KEY atau aktifkan provider lain di .env");
   process.exit(1);
 }
 
@@ -83,6 +86,16 @@ const qwenClient = QWEN_API_KEY
     })
   : null;
 
+// Local 9Router proxy on the same VPS (OpenAI-compatible API).
+const nineRouterClient = NINEROUTER_API_KEY
+  ? new OpenAI({
+      apiKey: NINEROUTER_API_KEY,
+      baseURL: NINEROUTER_BASE_URL,
+      timeout: 90000,
+      maxRetries: 0,
+    })
+  : null;
+
 // Available models
 function isTextChatModel(model) {
   return model && !/(^|[-_])vl([-_]|$)|vision/i.test(String(model || ""));
@@ -110,6 +123,9 @@ module.exports = {
   OPENROUTER_MODEL,
   OPENROUTER_MODELS,
   QWEN_API_KEY,
+  NINEROUTER_API_KEY,
+  NINEROUTER_BASE_URL,
+  NINEROUTER_MODEL,
   TAVILY_API_KEY,
   // Local model
   LOCAL_MODEL_ENABLED,
@@ -139,6 +155,7 @@ module.exports = {
   MAX_HISTORY,
   VALID_MOODS,
   // Clients
+  nineRouterClient,
   localClient,
   openRouterClient,
   qwenClient,
