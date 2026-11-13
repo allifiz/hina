@@ -15,6 +15,7 @@ function stripInternalPreamble(reply) {
 
   const labels = [...original.matchAll(META_LABEL)];
   const likelyPlan = labels.length >= 2 ||
+    /\b(?:mood(?:\s+internal(?:\s+hina)?)?|batasan|nuansa\s+pesan|instruksi\s+internal)\s*:/i.test(original.slice(1)) ||
     /(?:\b(?:tag\s+mood|tanpa\s+emoji|nuansa\s+pesan|mood\s+internal|jawaban\s+(?:akhir|final)|akhir(?:i|kan)?\s+tag)\b)/i.test(original);
   if (!likelyPlan) return original;
 
