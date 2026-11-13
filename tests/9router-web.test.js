@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 
 process.env.NINEROUTER_API_KEY = "testing-key-only";
 process.env.NINEROUTER_BASE_URL = "http://127.0.0.1:20128/v1";
-process.env.NINEROUTER_WEB_SEARCH_MODEL = "tavily/search";
+process.env.NINEROUTER_WEB_SEARCH_MODEL = "ag";
 process.env.NINEROUTER_WEB_FETCH_MODEL = "jina-reader/fetch";
 process.env.LOCAL_MODEL_ENABLED = "false";
 
@@ -52,7 +52,7 @@ test("search results are bounded and malformed/private URLs are excluded", () =>
   assert.equal(results[0].publishedAt, "2026-11-13");
 });
 
-test("9Router search uses real documented /v1/search payload and includes source in RAG", async (t) => {
+test("9Router Antigravity uses verified /v1/search web payload and includes sources in RAG", async (t) => {
   const original = global.fetch;
   let payload;
   global.fetch = async (url, options) => {
@@ -61,7 +61,7 @@ test("9Router search uses real documented /v1/search payload and includes source
     return {
       ok: true,
       json: async () => ({
-        provider: "tavily",
+        provider: "antigravity",
         results: [{ title: "Festival budaya", url: "https://example.com/festival", snippet: "Festival sedang ramai dibicarakan.", published_at: "2026-11-13" }],
       }),
     };
@@ -70,8 +70,8 @@ test("9Router search uses real documented /v1/search payload and includes source
   const direct = await search9Router("festival", { news: true, maxResults: 5 });
   assert.equal(direct[0].title, "Festival budaya");
   assert.deepEqual(Object.keys(payload).sort(), ["max_results", "model", "query", "search_type"]);
-  assert.equal(payload.model, "tavily/search");
-  assert.equal(payload.search_type, "news");
+  assert.equal(payload.model, "ag");
+  assert.equal(payload.search_type, "web");
 
   const context = await getRagContext("hin lagi rame apa sekarang?", "live_info");
   assert.match(context, /Festival budaya/);
@@ -105,6 +105,24 @@ test("fetching a supplied article uses /v1/web/fetch with bounded content", asyn
   const context = await getRagContext("baca ini https://example.com/berita/terbaru", "live_info");
   assert.match(context, /ISI ARTIKEL/);
   assert.match(context, /Isi artikel berita/);
+});
+
+
+test("Antigravity grounding results without published_at are preserved without invented dates", () => {
+  const results = normalizeSearchResults({
+    provider: "antigravity",
+    results: [{
+      title: "microsoft.com",
+      url: "https://vertexaisearch.cloud.google.com/grounding-api-redirect/EXAMPLE",
+      snippet: "Ringkasan dari Google Search grounding",
+      published_at: null,
+      display_url: "microsoft.com",
+      citation: { retrieved_at: "2026-11-13T15:04:19Z" },
+    }],
+  });
+  assert.equal(results.length, 1);
+  assert.equal(results[0].publishedAt, "");
+  assert.equal(results[0].source, "microsoft.com");
 });
 
 test("no web search is needed for ordinary roleplay", () => {
