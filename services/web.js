@@ -43,6 +43,8 @@ function needsGeneralWebInfo(text) {
 }
 
 function getRagMode(text) {
+  // A supplied article URL should be fetched directly even when its path contains "news".
+  if (/https?:\/\/[^\s]+/i.test(String(text || ""))) return "web";
   if (needsLiveInfo(text)) return "news";
   if (needsGeneralWebInfo(text)) return "web";
   return "none";
@@ -51,7 +53,10 @@ function getRagMode(text) {
 function extractLiveSearchQuery(text) {
   const raw = String(text || "").toLowerCase();
   if (/lagi rame apa|lagi ramai apa|ada yang (lagi )?viral|apa yang (lagi )?(rame|ramai|heboh|trending)|pada bahas apa|pada ngomongin apa|yang lagi hype apa|topik panas apa/i.test(raw)) {
-    return "berita populer viral tren budaya internet Indonesia terbaru";
+    const month = new Intl.DateTimeFormat("id-ID", {
+      timeZone: "Asia/Jakarta", month: "long", year: "numeric",
+    }).format(new Date());
+    return "berita populer viral tren budaya internet Indonesia " + month;
   }
 
   let cleaned = raw
