@@ -253,6 +253,7 @@ async function connectToWhatsApp() {
               isCreator: isOwner(sender),
               userEmotion,
               userIntent,
+              userText: textBody,
               timeContext: getTimeContext(),
               relationshipMode,
               relationshipState,
