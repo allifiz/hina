@@ -49,3 +49,22 @@ test("mood and relationship controls remain present and output tag goes at the e
   assert.match(prompt, /Di AKHIR balasan, tambahkan satu tag mood/);
   assert.match(prompt, /\[REMINDER: hari \| jam \| pesan\]/);
 });
+
+test("job rejection is treated as emotional, not ordinary small talk", () => {
+  const { detectIntent, detectUserEmotion } = require("../services/persona");
+  const text = "aku baru ditolak kerja, padahal udah berharap banget";
+  assert.equal(detectIntent(text), "curhat");
+  assert.equal(detectUserEmotion(text), "sedih");
+  assert.equal(getHinaReplyStyle(text, detectIntent(text), detectUserEmotion(text)), "supportive");
+});
+
+test("light teasing is playful while angry complaints should not be", () => {
+  assert.equal(getHinaReplyStyle("ih kamu tuh nyebelin banget tau ga", "ngobrol", "netral"), "playful");
+  assert.equal(getHinaReplyStyle("kamu nyebelin", "ngobrol", "marah"), "conversational");
+});
+
+test("owner does not get a default kak address", () => {
+  const prompt = getHinaPersona({ ...base, userName: "Allif", isCreator: true, relationshipMode: "owner" });
+  assert.match(prompt, /jangan panggil "kak" atau "kakak"/);
+  assert.match(prompt, /Harap|sudah berharap|harapan yang tidak terwujud|kasian banget/i);
+});
