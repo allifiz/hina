@@ -12,6 +12,18 @@ const rssParser = new Parser();
 const liveInfoCache = new Map();
 const webInfoCache = new Map();
 
+// Recognize claims about recent public events even without the words "news" or "terbaru".
+// Avoid routing someone's personal resignation, grief, or everyday chat into news search.
+function needsPublicEventVerification(text) {
+  const msg = String(text || "").toLowerCase();
+  const publicRole = /\b(wapres|wakil presiden|presiden|menteri|pejabat|gubernur|bupati|wali kota|walikota|kepala negara|anggota dpr|anggota mpr)\b/.test(msg);
+  const publicEvent = /\b(mundur|mengundurkan diri|ngundurin diri|resign|dicopot|diberhentikan|dipecat|dilantik|dimakzulkan|pemakzulan|ditahan|ditangkap|wafat|meninggal)\b/.test(msg);
+  const personalTopic = /\b(aku|saya|gue|gua|gw|ku|kamu|pacarku|temanku|temenku|kerjaku|bosku)\b/.test(msg);
+  const rumorCheck = /\b(beneran|benarkah|bener ga|bener gak|bener nggak|katanya|kabarnya|serius|hoaks|hoax|fakta|rumor)\b/.test(msg);
+  return (publicRole && (publicEvent || rumorCheck)) ||
+    (publicEvent && !personalTopic && (rumorCheck || msg.split(/\s+/).length <= 9));
+}
+
 function needsLiveInfo(text) {
   const msg = String(text || "").toLowerCase();
 
@@ -56,7 +68,7 @@ function isBareSearchRequest(text) {
 function getRagMode(text) {
   // A supplied article URL should be fetched directly even when its path contains "news".
   if (/https?:\/\/[^\s]+/i.test(String(text || ""))) return "web";
-  if (needsLiveInfo(text)) return "news";
+  if (needsLiveInfo(text) || needsPublicEventVerification(text)) return "news";
   if (needsGeneralWebInfo(text)) return "web";
   return "none";
 }
@@ -70,9 +82,17 @@ function extractLiveSearchQuery(text) {
     return "berita populer viral tren budaya internet Indonesia " + month;
   }
 
+  // Date-stamp specific political/office claims, so search does not rely on old facts.
+  const publicEvent = needsPublicEventVerification(text);
+  const searchPeriod = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
+
   let cleaned = raw
     .replace(/\bhina\b/g, "")
-    .replace(/\b(coba|search|browse|browsing|googling|cariin|carikan|cari|kasih|beritain|jelasin|info|update|tentang|dong|ya|nih)\b/g, "")
+    .replace(/\b(coba|search|browse|browsing|googling|cariin|carikan|cari|kasih|beritain|jelasin|info|update|tentang|dong|ya|nih|beneran|bener|benarkah|katanya|kabarnya|serius|hoaks|hoax)\b/g, "")
     .replace(/\b(berita|news|terbaru|terkini|hari ini|sekarang|viral|trending|hangat|isu)\b/g, "")
     .replace(/[?!.]/g, " ")
     .replace(/\s+/g, " ")
@@ -87,7 +107,7 @@ function extractLiveSearchQuery(text) {
     return "Indonesia";
   }
 
-  return cleaned;
+  return publicEvent ? `${cleaned} Indonesia ${searchPeriod}` : cleaned;
 }
 
 function extractWebSearchQuery(text) {
@@ -141,7 +161,7 @@ ATURAN PEMAKAIAN DATA LUAR:
 - Bedakan tanggal publikasi, tanggal kejadian, dan waktu pencarian. Jangan menyatakan berita lama sebagai berita hari ini.
 - Jawab dengan gaya Hina yang natural dan singkat; untuk berita serius lebih rapi.
 - Klaim kontroversial atau rumor harus disebut sebagai klaim/dugaan, bukan fakta terbukti.
-- Jika informasi tidak memadai, katakan keterbatasannya. Jangan mengarang sumber, tanggal, atau rincian.
+- Jika informasi tidak memadai, katakan keterbatasannya. Jangan mengarang sumber, tanggal, atau rincian. Jangan menyangkal klaim peristiwa terbaru hanya karena pencarian kosong/gagal.
 - Sebutkan sumber dengan nama dan tautan bila pengguna menanyakan berita/isu spesifik atau meminta sumber.
 `;
 }
@@ -220,7 +240,7 @@ KONTEKS LIVE / RAG:
 Hina mencoba mengambil info terbaru dari web, tapi gagal.
 
 ATURAN JAWAB:
-- Jangan mengarang berita terbaru.
+- Jangan mengarang berita terbaru atau menyangkal klaim peristiwa terbaru karena pencarian gagal.
 - Bilang jujur kalau pencarian live sedang gagal.
 - Boleh jawab pengetahuan umum kalau aman, tapi jelaskan bahwa itu bukan update terbaru.
 `;
@@ -404,6 +424,7 @@ async function getRagContext(text, userIntent) {
 
 module.exports = {
   getRagMode,
+  needsPublicEventVerification,
   isBareSearchRequest,
   extractWebSearchQuery,
   getRagContext,
