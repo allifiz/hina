@@ -80,7 +80,7 @@ test("bounded growth with latest events retained",t=>{
 test("WhatsApp wiring is guarded, opt-in and reset clears episodic state",()=>{
  const index=fs.readFileSync(path.join(__dirname,"..","index.js"),"utf8");
  const services=fs.readFileSync(path.join(__dirname,"..","handlers","services.js"),"utf8");
- assert.match(index,/episodeAutoOptIn = true/);
+ assert.match(index,/profile\.episodeAutoOptIn = commandLower === "\/episode on"/);
  assert.match(index,/captureIfOptedIn\(sender, textBody, profile\)/);
  assert.match(index,/getEpisodicContext\(sender, textBody\)/);
  assert.match(index,/\/episode add/);
