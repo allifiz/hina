@@ -5,6 +5,7 @@ const { getLiveInfoCache, getWebInfoCache, clearCaches } = require("../services/
 const { isOwner } = require("../utils");
 const { getLifeState } = require("../services/life-simulation");
 const { forgetTerm } = require("../services/language-learning");
+const { resetExpression } = require("../services/character-expression");
 const { forgetEpisode } = require("../services/episodic-memory");
 const { eligibleForProactive, chooseProactiveMessage, updateProactiveAfterSend } = require("../services/proactive-policy");
 const { memoryNotes, getMemoryNotes, rememberUserNote, forgetUserNotes } = require("../services/database");
@@ -335,11 +336,12 @@ async function handleOwnerCommands(sock, sender, lowerMsg, textBody, userMoods, 
     chatMemory.delete(sender);
     memoryNotes.delete(sender);
     forgetEpisode(sender, "semua");
-    forgetTerm(sender, "semua");
+    forgetTerm(sender, "semua"); // Also clears pending slang candidates.
     const profile = userProfiles.get(sender);
     if (profile) {
       profile.episodeAutoOptIn = false;
       profile.languageAutoOptIn = false;
+      resetExpression(profile);
     }
     saveDatabase();
     await replyText(sock, sender, "Riwayat chat, memori episodik, dan kosakata pribadi sudah aku hapus. Profil dan reminder tetap ada yaa :3");

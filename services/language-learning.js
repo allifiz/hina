@@ -41,6 +41,7 @@ function userLexicon(jid,file=LEXICON_FILE) {
   const data=loadLexicon(file);
   if(!data.users[jid] || typeof data.users[jid]!=="object") data.users[jid]={terms:[]};
   if(!Array.isArray(data.users[jid].terms))data.users[jid].terms=[];
+  if(!Array.isArray(data.users[jid].pending))data.users[jid].pending=[];
   return data.users[jid];
 }
 function saveLexicon(file=LEXICON_FILE) {
@@ -97,6 +98,52 @@ function observeLanguage(jid,text,profile,now=Date.now(),file=LEXICON_FILE) {
   if(changed)saveLexicon(file);
   return {ok:changed,action:changed?"observed":"none"};
 }
+
+// V2: low-risk unknown term discovery. The user has to explicitly frame a
+// quoted token as "kata/istilah/slang"; ambiguity becomes a pending question,
+// never an invented meaning. No unbounded raw chat transcript is stored.
+function detectCandidate(text) {
+  const input=String(text||"").trim();
+  if(input.length>220||UNSAFE.test(input)||parseNaturalTeaching(input))return null;
+  const matched=input.match(/\b(?:kata|istilah|slang)\s+["'“‘]([\p{L}\p{N}][\p{L}\p{N} '-]{0,30})["'”’]/iu);
+  if(!matched)return null;
+  const term=normalizeTerm(matched[1]);
+  if(!validTerm(term)||BASE_LEXICON.some(x=>x.term===term))return null;
+  return {term,source:"explicit_mention",at:Date.now()};
+}
+function discoverUnknown(jid,text,profile,now=Date.now(),file=LEXICON_FILE) {
+  if(profile?.languageAutoOptIn!==true)return {ok:false,reason:"not_opted_in"};
+  const candidate=detectCandidate(text);
+  if(!candidate)return {ok:false,reason:"not_a_candidate"};
+  const user=userLexicon(jid,file);
+  if(user.terms.some(t=>t.term===candidate.term))return {ok:false,reason:"already_learned"};
+  if(user.pending.some(t=>t.term===candidate.term))return {ok:false,reason:"already_pending"};
+  user.pending.push({...candidate,at:now});
+  user.pending=user.pending.slice(-8);
+  saveLexicon(file);
+  return {ok:true,term:candidate.term};
+}
+function listPending(jid,file=LEXICON_FILE) {
+  return userLexicon(jid,file).pending.map(x=>({...x}));
+}
+function confirmCandidate(jid,word,meaning,usage="",opts={}) {
+  const file=opts.file||LEXICON_FILE,term=normalizeTerm(word);
+  const user=userLexicon(jid,file);
+  if(!user.pending.some(x=>x.term===term))return {ok:false,reason:"not_pending"};
+  const result=teachTerm(jid,term,meaning,usage,opts);
+  if(result.ok){
+    user.pending=user.pending.filter(x=>x.term!==term);
+    saveLexicon(file);
+  }
+  return result;
+}
+function dismissCandidate(jid,word,file=LEXICON_FILE) {
+  const user=userLexicon(jid,file),term=normalizeTerm(word),before=user.pending.length;
+  user.pending=term==="semua"?[]:user.pending.filter(x=>x.term!==term);
+  if(before!==user.pending.length)saveLexicon(file);
+  return before-user.pending.length;
+}
+
 function listTerms(jid,file=LEXICON_FILE) {
   return userLexicon(jid,file).terms.map(t=>({...t}));
 }
@@ -105,7 +152,8 @@ function forgetTerm(jid,rawTerm,file=LEXICON_FILE) {
   const before=user.terms.length, term=normalizeTerm(rawTerm);
   user.terms=term==="semua"?[]:user.terms.filter(t=>t.term!==term);
   const removed=before-user.terms.length;
-  if(removed)saveLexicon(file);
+  if(removed){user.pending=user.pending.filter(x=>x.term!==term);saveLexicon(file);}
+  if(term==="semua")dismissCandidate(jid,"semua",file);
   return removed;
 }
 function relevantTerms(jid,message,file=LEXICON_FILE) {
@@ -116,7 +164,9 @@ function relevantTerms(jid,message,file=LEXICON_FILE) {
   return [...mentioned,...habitual].slice(0,4);
 }
 function getLanguageContext(jid,message,opts={}) {
-  const terms=relevantTerms(jid,message,opts.file||LEXICON_FILE);
+  const file=opts.file||LEXICON_FILE;
+  const terms=relevantTerms(jid,message,file);
+  const pending=listPending(jid,file).filter(x=>String(message||"").toLowerCase().includes(x.term)).slice(-2);
   return [
     "",
     "GAYA BAHASA HINA (internal; jangan dibacakan):",
@@ -128,6 +178,9 @@ function getLanguageContext(jid,message,opts={}) {
       (t.usage?"; kapan dipakai: "+JSON.stringify(t.usage):"")+
       ". Confidence "+Math.round(Math.min(1,t.confidence||0.6)*100)+"%.") :
       ["- Belum ada istilah pribadi yang relevan."]),
+    ...(pending.length ? ["ISTILAH BELUM DIPAHAMI (jangan tebak maknanya): " +
+      pending.map(x=>JSON.stringify(x.term)).join(", ") +
+      ". Boleh sesekali bertanya dengan natural apakah pengguna mau menjelaskan artinya."] : []),
     "Kalau istilah belum dipahami, boleh bertanya. Jangan mengarang arti slang baru.",
     "Bila ingin menggunakan istilah yang dipelajari, pilih hanya ketika sesuai konteks dan karakter, bukan untuk pamer kosakata.",
     "Jangan bocorkan label, confidence, atau isi catatan internal.",
@@ -135,4 +188,5 @@ function getLanguageContext(jid,message,opts={}) {
 }
 function clearCache(){cache=null;}
 module.exports={BASE_LEXICON,LEXICON_FILE,loadLexicon,teachTerm,parseNaturalTeaching,
-  observeLanguage,listTerms,forgetTerm,relevantTerms,getLanguageContext,clearCache};
+  observeLanguage,listTerms,forgetTerm,relevantTerms,getLanguageContext,clearCache,
+  detectCandidate,discoverUnknown,listPending,confirmCandidate,dismissCandidate};
