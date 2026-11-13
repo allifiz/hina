@@ -3,6 +3,7 @@ const { sendVoiceReply } = require("../services/media");
 const { getPrimaryRouteLabel } = require("../services/ai");
 const { getLiveInfoCache, getWebInfoCache, clearCaches } = require("../services/web");
 const { isOwner } = require("../utils");
+const { memoryNotes, getMemoryNotes, rememberUserNote, forgetUserNotes } = require("../services/database");
 
 function startReminderService(sock, reminders, saveDatabase) {
   setInterval(async () => {
@@ -289,11 +290,41 @@ async function handleOwnerCommands(sock, sender, lowerMsg, textBody, userMoods, 
     );
     return true;
   }
+  if (lowerMsg === "/ingat") {
+    const saved = getMemoryNotes(sender);
+    await replyText(sock, sender, saved.length
+      ? "Yang aku simpan tentang kamu:\n" + saved.map((note, i) => (i + 1) + ". " + note).join("\n")
+      : "Belum ada catatan khusus. Pakai /ingat sesuatu yang ingin aku ingat yaa.");
+    return true;
+  }
+  if (lowerMsg.startsWith("/ingat ")) {
+    const note = textBody.slice("/ingat ".length).trim();
+    if (note.length > 180) {
+      await replyText(sock, sender, "Boleh diringkas jadi maksimal 180 karakter dulu? :3");
+      return true;
+    }
+    const stored = rememberUserNote(sender, note);
+    await replyText(sock, sender, stored ? "Okee, ini aku simpan buat obrolan berikutnya :3" : "Itu udah aku ingat, atau catatannya kosong.");
+    return true;
+  }
+  if (lowerMsg === "/lupa" || lowerMsg === "/lupakan") {
+    await replyText(sock, sender, "Pakai /lupa kata-kunci untuk hapus catatan tertentu, atau /lupa semua.");
+    return true;
+  }
+  if (lowerMsg.startsWith("/lupa ") || lowerMsg.startsWith("/lupakan ")) {
+    const pattern = textBody.slice(textBody.indexOf(" ") + 1).trim();
+    const removed = forgetUserNotes(sender, pattern);
+    await replyText(sock, sender, removed
+      ? removed + " catatan sudah aku hapus."
+      : "Aku nggak nemu catatan yang cocok.");
+    return true;
+  }
   if (lowerMsg === "/resetme") {
     // Delete only this sender's archived conversation, never other users' data.
     chatMemory.delete(sender);
+    memoryNotes.delete(sender);
     saveDatabase();
-    await replyText(sock, sender, "Riwayat chat kamu sudah aku hapus dari memoriku yaa. Data profil dan reminder tetap ada :3");
+    await replyText(sock, sender, "Riwayat chat dan catatan memorimu sudah aku hapus. Profil dan reminder tetap ada yaa :3");
     return true;
   }
   if (lowerMsg === "/help") {
@@ -301,7 +332,7 @@ async function handleOwnerCommands(sock, sender, lowerMsg, textBody, userMoods, 
       sock,
       sender,
       `Command Hina:
-Public: /help, /owner, /resetme, /mood, /stats, /vn teks
+Public: /help, /owner, /ingat [catatan], /lupa kata-kunci|semua, /resetme, /mood, /stats, /vn teks
 Owner: /status, /model, /ragcache, /clearcache, /userinfo, /users, /resetrel, /setrespect, /settension, /setstage, /setname, /ban, /unban, /reminders, /clearreminders`
     );
     return true;
