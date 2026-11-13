@@ -5,7 +5,7 @@ const os=require("node:os");
 const path=require("node:path");
 process.env.LOCAL_MODEL_ENABLED="false";
 process.env.NINEROUTER_API_KEY="unit-test-only";
-const {buildClaimEvidence,normalizeReview,verifyProjectKnowledge,attachReview,getReview}=require("../services/knowledge-verification");
+const {buildClaimEvidence,normalizeReview,verifyProjectKnowledge,attachReview,getReview,getKnowledgeContext}=require("../services/knowledge-verification");
 const {defaults,normalizeLearning,learningEligibility,toggleLearning,runLearningCycle}=require("../services/autonomous-learning");
 const {composeCognitiveContext,cognitionDecision,MAX_CONTEXT}=require("../services/unified-cognition");
 const {inspectFoundation,consolidateMemory,foundationSummary}=require("../services/foundation-health");
@@ -34,6 +34,15 @@ test("cross-source similarity is not a declaration of verified truth",()=>{
  const normalized=normalizeReview(report,NOW);
  assert.equal(normalized.sources.length,2);
  assert.ok(normalized.claims.every(c=>c.certainty==="unverified_semantics"));
+});
+test("knowledge review is visible as cautious sourced context, not promoted to fact",()=>{
+ const review=buildClaimEvidence([source("https://alpha.example.org/one"),source("https://beta.example.edu/two")],NOW);
+ const projectCopy={...project,knowledgeReviews:[review]};
+ const state={creativeProjects:{projects:[projectCopy]}};
+ const result=getKnowledgeContext(state,NOW);
+ assert.match(result,/Calon klaim/);
+ assert.match(result,/TIDAK membuktikan kebenaran/);
+ assert.match(result,/https:\/\/alpha\.example\.org/);
 });
 test("independent URLs must use different domains and public addresses",()=>{
  const report=buildClaimEvidence([
