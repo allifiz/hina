@@ -1,51 +1,87 @@
-// Hina V4: output boundary. Model-written strategy/notes must never enter WhatsApp.
-// This is a deterministic last-mile guard, not a replacement for correct prompting.
-const META_OPENING = /^(?:konteks\s*:\s*(?:user|pengguna|teman|allif|percakapan)|mood\s*:\s*(?:malu|ceria|senang|biasa|sedih|marah|kesal|netral|mengantuk)|nuansa pesan\s*:|batasan\s*:|analisis(?:\s+internal)?\s*:|strategi\s*:|rencana jawaban\s*:|instruksi(?:\s+internal)?\s*:|catatan(?:\s+internal)?\s*:)/i;
-const META_LINE = /^(?:konteks|mood|nuansa pesan|batasan|analisis|strategi|rencana jawaban|instruksi internal|catatan internal|aturan jawab|self-respect)\s*:/i;
+// Hina V4: deterministic boundary between model notes and WhatsApp output.
+// Internal preambles aren't conversational replies. Never relay them or save
+// them as examples for the next completion.
+const META_START = /^(?:konteks|mood(?:\s+internal(?:\s+hina)?)?|nuansa(?:\s+pesan)?|batasan|analisis(?:\s+internal)?|strategi|rencana\s+jawaban|instruksi(?:\s+internal)?|catatan(?:\s+internal)?|aturan\s+jawab|self-respect)\s*:/i;
+const META_LABEL = /(?:^|\n)\s*(?:konteks|mood(?:\s+internal(?:\s+hina)?)?|nuansa(?:\s+pesan)?|batasan|analisis(?:\s+internal)?|strategi|rencana\s+jawaban|instruksi(?:\s+internal)?|catatan(?:\s+internal)?|aturan\s+jawab|self-respect)\s*:/gi;
 const STALE_CAPABILITY_CLAIM = /(?:akses\s+web\s+(?:umum)?(?:ku|nya)?\s+(?:lagi\s+)?belum\s+aktif|(?:web\s+search|browsing|akses\s+internet)\s+(?:real.?time\s+)?(?:ku\s+)?(?:belum|tidak|gak|nggak)\s+(?:aktif|tersedia)|TAVILY_API_KEY\s+belum\s+diisi)/i;
 
+// Some providers start with an internal plan, then write the final reply.
+// Examples seen in the wild: "Konteks: Karhutla...", "Mood internal Hina:...",
+// "Balasan: Santai tapi prihatin, ... akhiri tag mood. Nah itu juga..."
+// Never trust a response that still looks like a model planning transcript.
 function stripInternalPreamble(reply) {
   const original = String(reply || "").trim();
-  if (!META_OPENING.test(original)) return original;
+  if (!META_START.test(original)) return original;
 
-  // Models sometimes leak "Konteks: ... Mood: ... Batasan: ... Tag mood di akhir."
-  // and then append their actual WhatsApp response, without a newline.
-  const finalMarker = /(?:tag\s+mood\s+di\s+akhir|(?:jawaban|balasan)\s+(?:akhir|final)\s*:)\s*[.!:\-–]?\s*/i;
-  const markerMatch = finalMarker.exec(original);
-  if (markerMatch && markerMatch.index < 3000) {
-    const remainder = original.slice(markerMatch.index + markerMatch[0].length).trim();
-    return META_OPENING.test(remainder) ? "" : remainder;
-  }
+  const labels = [...original.matchAll(META_LABEL)];
+  const likelyPlan = labels.length >= 2 ||
+    /(?:\b(?:tag\s+mood|tanpa\s+emoji|nuansa\s+pesan|mood\s+internal|jawaban\s+(?:akhir|final)|akhir(?:i|kan)?\s+tag)\b)/i.test(original);
+  if (!likelyPlan) return original;
 
-  // Safe when the model emits a separate labelled "Hina: ..." answer section.
-  const answerMarker = /(?:^|\n)\s*(?:balasan hina|pesan whatsapp|jawaban ke user|hina)\s*:\s*(\S[\s\S]*)$/im;
-  const answerMatch = answerMarker.exec(original);
-  if (answerMatch) {
-    const remainder = answerMatch[1].trim();
-    return META_OPENING.test(remainder) ? "" : remainder;
-  }
-
-  const lines = original.split(/\r?\n/);
-  let at = 0;
-  let sawSeparator = false;
-  while (at < lines.length && (META_LINE.test(lines[at].trim()) || !lines[at].trim())) {
-    if (!lines[at].trim()) sawSeparator = true;
-    at++;
-  }
-  // Metadata may wrap across multiple unlabelled lines.
-  // Release unlabelled text only if a blank line separated it from the meta block.
-  if (sawSeparator && at < lines.length && !META_LINE.test(lines[at].trim())) {
-    const candidate = lines.slice(at).join("\n").trim();
-    if (!/(?:\bKonteks:\s*(?:User|Pengguna)|\bNuansa pesan:|\bBatasan:)/i.test(candidate)) {
-      return candidate;
+  // Prefer an explicit ending of the writing plan, then take only the text
+  // *after* it. We require a complete instruction sentence to avoid splitting
+  // natural text merely containing the word "mood".
+  const instructionEnds = [
+    /(?:tag\s+mood\s+di\s+akhir)\s*[.!:;\-–]?\s*/gi,
+    /(?:akhir(?:i|kan)?\s+(?:dengan\s+)?tag\s+mood)\s*[.!:;\-–]?\s*/gi,
+  ];
+  for (const pattern of instructionEnds) {
+    let match;
+    let last = null;
+    while ((match = pattern.exec(original)) !== null) {
+      last = match;
+    }
+    if (last && last.index < 3000) {
+      const candidate = original.slice(last.index + last[0].length).trim();
+      if (candidate && !META_START.test(candidate) && !/^(?:balasan|jawaban)\s*:/i.test(candidate)) {
+        return candidate;
+      }
     }
   }
-  return "";
+
+  // The last explicit "Hina:"/"Jawaban final:" section generally contains
+  // speech, not planning instructions.
+  const definiteAnswer = /(?:^|\n)\s*(?:balasan\s+hina|jawaban\s+(?:akhir|final|ke\s+user)|pesan\s+whatsapp|hina)\s*:\s*/gim;
+  let match;
+  let lastAnswer = null;
+  while ((match = definiteAnswer.exec(original)) !== null) lastAnswer = match;
+  if (lastAnswer) {
+    const candidate = original.slice(lastAnswer.index + lastAnswer[0].length).trim();
+    return looksLikeInternalNote(candidate) ? "" : candidate;
+  }
+
+  // "Balasan:" is ambiguous: it may contain a *description* of how to write,
+  // rather than the actual reply. Disallow any candidate that starts with
+  // directives like "Santai tapi prihatin, tanpa emoji...".
+  const genericAnswer = /(?:^|\n)\s*(?:balasan|jawaban)\s*:\s*/gim;
+  let lastGeneric = null;
+  while ((match = genericAnswer.exec(original)) !== null) lastGeneric = match;
+  if (lastGeneric) {
+    const candidate = original.slice(lastGeneric.index + lastGeneric[0].length).trim();
+    return looksLikeInternalNote(candidate) ? "" : candidate;
+  }
+
+  // Multi-line preamble separated from actual reply by an empty line.
+  const blocks = original.split(/\n\s*\n/);
+  if (blocks.length > 1) {
+    const candidate = blocks.slice(1).join("\n\n").trim();
+    return looksLikeInternalNote(candidate) ? "" : candidate;
+  }
+
+  return ""; // Better to ask user to retry than leak internal notes.
+}
+
+function looksLikeInternalNote(content) {
+  const text = String(content || "").trim();
+  return !text || META_START.test(text) ||
+    /^(?:santai|singkat|natural|hangat|informative|informatif|formal|non-formal|tanpa\s+emoji|jangan\s+|gunakan\s+|sebutkan\s+).{0,110}(?:\b(?:tag\s+mood|emoji|jawab|nuansa|ak(hir|hiri)|gaya|respons|respon)\b)/i.test(text) ||
+    /^(?:akhiri|tambahkan|sertakan)\s+(?:dengan\s+)?(?:tag\s+mood|mood|emoji)\b/i.test(text);
 }
 
 function isUnreliableAssistantContext(content) {
-  const text = String(content || "");
-  return META_OPENING.test(text.trim()) || STALE_CAPABILITY_CLAIM.test(text);
+  const text = String(content || "").trim();
+  return (META_START.test(text) && stripInternalPreamble(text) !== text) ||
+    STALE_CAPABILITY_CLAIM.test(text);
 }
 
 function filterContextHistory(history) {
