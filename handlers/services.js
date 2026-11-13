@@ -290,8 +290,10 @@ async function handleOwnerCommands(sock, sender, lowerMsg, textBody, userMoods, 
     return true;
   }
   if (lowerMsg === "/resetme") {
+    // Delete only this sender's archived conversation, never other users' data.
     chatMemory.delete(sender);
-    await replyText(sock, sender, "Oke kak, memory obrolan sementaramu sudah aku reset ya :3");
+    saveDatabase();
+    await replyText(sock, sender, "Riwayat chat kamu sudah aku hapus dari memoriku yaa. Data profil dan reminder tetap ada :3");
     return true;
   }
   if (lowerMsg === "/help") {
@@ -333,11 +335,12 @@ Reminder: ${reminders.length}`
   if (lowerMsg === "/model") {
     if (await denyIfNotOwner(sock, sender)) return true;
 
-    const { OPENROUTER_AVAILABLE_MODELS, QWEN_AVAILABLE_MODELS, QWEN_MODEL_VISION } = require("../config");
+    const { NINEROUTER_AVAILABLE_MODELS, OPENROUTER_AVAILABLE_MODELS, QWEN_AVAILABLE_MODELS, QWEN_MODEL_VISION } = require("../config");
     await replyText(
       sock,
       sender,
       `Model aktif:
+9Router (urutan prioritas): ${NINEROUTER_AVAILABLE_MODELS.join(" -> ") || "-"}
 OpenRouter: ${OPENROUTER_AVAILABLE_MODELS.join(", ") || "-"}
 Qwen text: ${QWEN_AVAILABLE_MODELS.join(", ") || "-"}
 Qwen vision: ${QWEN_MODEL_VISION || "-"}`
