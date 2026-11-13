@@ -11,7 +11,7 @@ const {
 }=require("../services/project-research");
 const {initialProjects,createCandidate,activateCandidate,normalizeProjects}=require("../services/creative-projects");
 const {loadLifeState,getLifeState,saveLifeState}=require("../services/life-simulation");
-const NOW=Date.parse("2026-11-14T05:00:00Z");
+const NOW=Date.parse("2026-11-13T10:00:00Z");
 const project={id:"project-watercolor-test",title:"Menelaah warna cat air",description:"Eksplorasi palet cat air dalam tulisan",interest:"watercolor",createdAt:NOW,status:"active",steps:0,evidence:[],artifact:""};
 function tempFile(t){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),"hina-research-"));
