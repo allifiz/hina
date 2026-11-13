@@ -49,6 +49,7 @@ const { updateRelationshipState, getRelationshipContext, shouldUseInstantReply }
 const { getHinaReplyStyle } = require("./services/persona");
 const { resolveHinaMood } = require("./services/mood");
 const { getReconnectDelay } = require("./services/connection-retry");
+const { filterContextHistory } = require("./services/output-guard");
 
 // Handlers
 const { startReminderService, startProactiveMessaging, handleOwnerCommands } = require("./handlers/services");
@@ -292,7 +293,9 @@ async function connectToWhatsApp() {
       }
 
       appendChatMessage(sender, "user", textBody);
-      const history = getRecentChatMessages(sender, MAX_HISTORY);
+      // Keep stored history intact, but don't teach the next reply from old
+      // assistant mistakes or leaked internal scratch notes.
+      const history = filterContextHistory(getRecentChatMessages(sender, MAX_HISTORY));
       const relevantMemory = getRelevantChatMemories(sender, textBody, MAX_HISTORY);
 
       let liveContext = "";

@@ -1,4 +1,5 @@
 const { OWNER_NUMBER, PARTNER_NUMBER, OWNER_NAME, PARTNER_NAME, OWNER_LID, PARTNER_LID, VALID_MOODS } = require("./config");
+const { stripInternalPreamble } = require("./services/output-guard");
 
 function extractNumberFromJid(jid) {
   if (!jid) return "";
@@ -170,9 +171,9 @@ function stabilizeMood(previousMood, detectedEmotion, aiMood) {
 }
 
 function cleanBotReply(reply) {
-  if (!reply) return "Aku bingung jawabnya, kak ;w;";
+  if (!reply) return "eh, aku tadi salah nangkep. ulang dikit dong?";
 
-  const cleaned = stripReasoningTags(reply)
+  const cleaned = stripInternalPreamble(stripReasoningTags(reply))
     // hapus tag mood/moodle di mana pun
     .replace(/\[(mood|moodle)\s*:\s*[^\]]+\]/gi, "")
 
@@ -202,7 +203,7 @@ function cleanBotReply(reply) {
     .replace(/\s{2,}/g, " ")
     .trim();
 
-  return cleaned || "Gua lagi males jawab panjang. Ngomong yang jelas.";
+  return cleaned || "eh, bentar. aku tadi malah kepanjangan mikir. coba ulang sedikit?";
 }
 function parseReminderTag(text) {
   const match = String(text || "").match(/\[REMINDER:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\]/i);
