@@ -11,6 +11,7 @@ const { initialBeliefState, normalizeBeliefState, reflectOnExperience, getBelief
 const { freshGoalState, normalizeGoalState, reflectGoal, getGoalContext, getGoalSummary } = require("./character-growth");
 const { initialProjects, normalizeProjects, advanceProject, getCreativeContext, projectSummary, discoverWeekly } = require("./creative-projects");
 const { researchContext } = require("./project-research");
+const { getKnowledgeContext } = require("./knowledge-verification");
 const { defaults: initialLearning, normalizeLearning } = require("./autonomous-learning");
 const { inspectFoundation, consolidateMemory } = require("./foundation-health");
 
@@ -231,6 +232,7 @@ function getLifeContext(now = Date.now(), file = LIFE_FILE, userText = "") {
     getGoalContext(current),
     getCreativeContext(current),
     researchContext(current, now),
+    getKnowledgeContext(current, now),
     "Ketertarikan: " + interests.map((i) => CHARACTER.interests[i.key].name +
       " (pengalaman " + i.explored + ", perkembangan " + i.level + "/4)").join("; ") + ".",
     "Catatan refleksi yang BENAR-BENAR dijalankan oleh sistem simulasi:",
