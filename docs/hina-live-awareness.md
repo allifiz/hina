@@ -14,7 +14,29 @@ See upstream docs:
 - https://raw.githubusercontent.com/decolua/9router/refs/heads/master/skills/9router-web-search/SKILL.md
 - https://raw.githubusercontent.com/decolua/9router/refs/heads/master/skills/9router-web-fetch/SKILL.md
 
-## Azure setup (read-only discovery first)
+## Azure setup: verified Antigravity provider
+
+On November 13, 2026 the 9Router v0.5.119 dashboard confirmed the Antigravity
+webSearch connection was **active**. Its built-in test succeeded in about
+4.4 seconds with:
+```json
+{"model":"ag","query":"What is the latest news about AI?","search_type":"web","max_results":5}
+```
+The result contained `provider:"antigravity"`, `results[]`,
+`snippet`, Google grounding redirect URLs, `display_url`, and citation
+retrieval timestamps. Publication dates were null for some results: **do not
+mistake retrieval time for publication/event time**.
+
+The earlier `GET /v1/models/web` response returned an empty catalog, even
+though the direct API test worked. For this verified setup the application
+defaults to `NINEROUTER_WEB_SEARCH_MODEL=ag`, and it sends
+`search_type:"web"` (including for news/trending questions). The news
+query itself includes a Jakarta-local month/year.
+
+A separate webFetch provider has **not** been confirmed, and is intentionally
+left disabled. Google News RSS/Tavily remain fallbacks.
+
+## Optional provider discovery
 
 The current server has the proxy at `http://127.0.0.1:20128/v1`. Do not print API keys.
 
@@ -40,14 +62,16 @@ NODE
 
 If **nothing** appears, open 9Router's provider configuration UI and connect/enable a web search provider such as Tavily, Brave, Exa, or a self-hosted SearXNG; for article fetching use a provider such as Jina Reader, Tavily, or Firecrawl. Merely seeing those capabilities under Skills does not prove provider availability. A provider may require its own credentials, quota, payment, or service setup.
 
-Once the desired search and fetch IDs appear, set these in `~/bot-hina/.env` (use the actual IDs listed by the server):
+The Antigravity search model `ag` is enabled by default with no new secrets
+or environment edits required. To make the selection explicit on Azure, add:
 
 ```dotenv
-NINEROUTER_WEB_SEARCH_MODEL=search-combo
-NINEROUTER_WEB_FETCH_MODEL=fetch-combo
+NINEROUTER_WEB_SEARCH_MODEL=ag
 ```
 
-If the listed model ID isn't `search-combo` or `fetch-combo`, **use the listed ID instead**. Either setting may be omitted to leave that capability disabled. The Gemini chat model is unchanged.
+When a **separate Web Fetch** provider is active and its actual ID is verified,
+you can add `NINEROUTER_WEB_FETCH_MODEL=<verified id>`. Leave it unset otherwise.
+The Gemini chat model and WhatsApp auth are unchanged.
 
 ## Behavior
 
@@ -72,4 +96,9 @@ When 9Router web search fails, news falls back to Google News RSS; general web u
 
 ## Deployment
 
-First verify the provider IDs and test actual search via 9Router in the Azure terminal. Do not merge this PR until that is confirmed. Merge to `main` triggers GitHub Actions deployment and restarts `hina.service`.
+Antigravity search was verified using the built-in 9Router test on the live
+Azure-backed proxy. After merging to `main`, GitHub Actions restarts
+`hina.service`. Verify the first live WhatsApp query (e.g.,
+"Hin, lagi rame apa hari ini?") and inspect `journalctl -u hina`.
+The search cannot guarantee that all grounding sources were published today.
+Ordinary personal chat should not invoke web search.
