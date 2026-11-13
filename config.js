@@ -19,7 +19,15 @@ const OPENROUTER_MODELS = getEnvValue("OPENROUTER_MODELS");
 const QWEN_API_KEY = getEnvValue("QWEN_API_KEY");
 const NINEROUTER_API_KEY = getEnvValue("NINEROUTER_API_KEY");
 const NINEROUTER_BASE_URL = getEnvValue("NINEROUTER_BASE_URL") || "http://127.0.0.1:20128/v1";
+// Old NINEROUTER_MODEL is preserved as an additional fallback for existing VPS .env files.
 const NINEROUTER_MODEL = getEnvValue("NINEROUTER_MODEL") || "ag/gpt-oss-120b-medium";
+const NINEROUTER_PRIMARY_MODEL = getEnvValue("NINEROUTER_PRIMARY_MODEL") || "openrouter/baidu/ernie-5.5-flash-preview:free";
+const NINEROUTER_FALLBACK_MODELS = getEnvValue("NINEROUTER_FALLBACK_MODELS") || "ag/gpt-oss-120b-medium";
+const NINEROUTER_AVAILABLE_MODELS = [
+  NINEROUTER_PRIMARY_MODEL,
+  ...NINEROUTER_FALLBACK_MODELS.split(",").map((model) => model.trim()),
+  NINEROUTER_MODEL,
+].filter((model, index, models) => model && models.indexOf(model) === index);
 const TAVILY_API_KEY = getEnvValue("TAVILY_API_KEY");
 
 // Local llama.cpp / OpenAI-compatible server
@@ -126,6 +134,9 @@ module.exports = {
   NINEROUTER_API_KEY,
   NINEROUTER_BASE_URL,
   NINEROUTER_MODEL,
+  NINEROUTER_PRIMARY_MODEL,
+  NINEROUTER_FALLBACK_MODELS,
+  NINEROUTER_AVAILABLE_MODELS,
   TAVILY_API_KEY,
   // Local model
   LOCAL_MODEL_ENABLED,
