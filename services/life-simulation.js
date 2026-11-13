@@ -11,6 +11,9 @@ const { initialBeliefState, normalizeBeliefState, reflectOnExperience, getBelief
 const { freshGoalState, normalizeGoalState, reflectGoal, getGoalContext, getGoalSummary } = require("./character-growth");
 const { initialProjects, normalizeProjects, advanceProject, getCreativeContext, projectSummary, discoverWeekly } = require("./creative-projects");
 const { researchContext } = require("./project-research");
+const { getKnowledgeContext } = require("./knowledge-verification");
+const { defaults: initialLearning, normalizeLearning } = require("./autonomous-learning");
+const { inspectFoundation, consolidateMemory } = require("./foundation-health");
 
 const LIFE_FILE = process.env.HINA_LIFE_FILE || DB_FILE + ".life.json";
 const MAX_EVENTS = 90;
@@ -32,6 +35,8 @@ function seedState(now = Date.now()) {
     motivation: initialMotivation(),
     goalState: freshGoalState(now),
     creativeProjects: initialProjects(),
+    autonomousLearning: initialLearning(),
+    memoryIndex: [],
     interests: Object.fromEntries(INTEREST_KEYS.map((key) => [key, { affinity: 1, explored: 0, level: 0 }])),
     experiences: [],
     milestones: [],
@@ -40,9 +45,18 @@ function seedState(now = Date.now()) {
 
 function loadLifeState(now = Date.now(), file = LIFE_FILE) {
   if (!Number.isFinite(now)) throw new Error("Invalid timestamp");
-  if (fs.existsSync(file)) {
+  if (fs.existsSync(file) || fs.existsSync(file+".bak")) {
     try {
-      const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+      let parsed;
+      try {
+        parsed = JSON.parse(fs.readFileSync(file,"utf8"));
+      } catch (problem) {
+        if (!fs.existsSync(file+".bak")) throw problem;
+        console.warn(LOG_PREFIX,"State utama rusak, memulihkan salinan terakhir yang valid.");
+        parsed = JSON.parse(fs.readFileSync(file+".bak","utf8"));
+        // Restore the good file before the next save rotates backups.
+        fs.copyFileSync(file+".bak",file);
+      }
       if (parsed && parsed.version === 1 && Number.isFinite(parsed.createdAt) &&
           Array.isArray(parsed.experiences) && parsed.interests && typeof parsed.interests === "object") {
         const fallback = seedState(now);
@@ -56,14 +70,19 @@ function loadLifeState(now = Date.now(), file = LIFE_FILE) {
           goalState: normalizeGoalState(parsed.goalState,
             Number.isFinite(parsed.lastTickAt) ? parsed.lastTickAt : now, parsed.interests),
           creativeProjects: normalizeProjects(parsed.creativeProjects),
+          autonomousLearning: normalizeLearning(parsed.autonomousLearning),
+          memoryIndex: Array.isArray(parsed.memoryIndex)?parsed.memoryIndex.filter(x=>
+            x && INTEREST_KEYS.includes(x.interest) && Array.isArray(x.eventIds)
+          ).slice(-16):[],
           experiences: parsed.experiences.filter((x) => x && typeof x === "object" && Number.isFinite(x.at)).slice(-MAX_EVENTS),
           milestones: Array.isArray(parsed.milestones) ? parsed.milestones.slice(-40) : [],
         };
         return state;
       }
-      console.warn(LOG_PREFIX, "Skema file kehidupan tidak valid; memulai state baru.");
+      throw new Error("Skema state tidak valid. Dihentikan agar memori lama tidak tertimpa.");
     } catch (error) {
-      console.warn(LOG_PREFIX, "Gagal baca file kehidupan:", error.message);
+      console.error(LOG_PREFIX, "State tidak dapat dipulihkan:", error.message);
+      throw error;
     }
   }
   state = seedState(now);
@@ -82,10 +101,12 @@ function saveLifeState(file = LIFE_FILE) {
   try {
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
     fs.writeFileSync(temp, JSON.stringify(state, null, 2), { mode: 0o600 });
+    if (fs.existsSync(file)) fs.copyFileSync(file, file+".bak");
     fs.renameSync(temp, file);
   } catch (error) {
     try { fs.unlinkSync(temp); } catch {}
     console.error(LOG_PREFIX, "Gagal simpan kehidupan:", error.message);
+    throw error;
   }
 }
 
@@ -177,7 +198,10 @@ function tickLife(now = Date.now(), file = LIFE_FILE) {
     existing.add(key);
   }
   current.lastTickAt = now;
-  if (created.length) discoverWeekly(current, now);
+  if (created.length) {
+    discoverWeekly(current, now);
+    consolidateMemory(current, now);
+  }
   saveLifeState(file);
   if (created.length) console.info(LOG_PREFIX, created.length + " pengalaman simulasi tercatat.");
   return created;
@@ -208,6 +232,7 @@ function getLifeContext(now = Date.now(), file = LIFE_FILE, userText = "") {
     getGoalContext(current),
     getCreativeContext(current),
     researchContext(current, now),
+    getKnowledgeContext(current, now),
     "Ketertarikan: " + interests.map((i) => CHARACTER.interests[i.key].name +
       " (pengalaman " + i.explored + ", perkembangan " + i.level + "/4)").join("; ") + ".",
     "Catatan refleksi yang BENAR-BENAR dijalankan oleh sistem simulasi:",
@@ -233,6 +258,7 @@ function getLifeSummary(now = Date.now(), file = LIFE_FILE) {
     getBeliefSummary(current),
     getGoalSummary(current),
     projectSummary(current),
+    "Indeks memori: " + (current.memoryIndex?.length || 0),
     "Terakhir: " + (latest ? getWibClock(latest.at).formatted +
       " | " + CHARACTER.interests[latest.interest].name + " | " + latest.activity : "belum ada"),
   ].join("\n");

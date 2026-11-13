@@ -95,5 +95,5 @@ test("WhatsApp learning controls are opt-in and model receives contextual lexico
  assert.match(app,/teachTerm\(sender/);
  assert.match(app,/observeLanguage\(sender, textBody, profile\)/);
  assert.match(app,/getLanguageContext\(sender, textBody\)/);
- assert.match(app,/languageContext \+ relevantMemory/);
+ assert.match(app,/language:languageContext,chatMemory:relevantMemory/);
 });
