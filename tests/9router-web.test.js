@@ -13,7 +13,7 @@ const {
   search9Router,
   fetch9RouterArticle,
 } = require("../services/9router-web");
-const { getRagMode, getRagContext } = require("../services/web");
+const { getRagMode, getRagContext, isBareSearchRequest, extractWebSearchQuery } = require("../services/web");
 
 test("recognizes social trends and direct article URLs but not normal chatting", () => {
   assert.equal(getRagMode("hin, lagi rame apa sekarang?"), "news");
@@ -127,4 +127,52 @@ test("Antigravity grounding results without published_at are preserved without i
 
 test("no web search is needed for ordinary roleplay", () => {
   assert.equal(getRagMode("kangen kamu, Hin"), "none");
+});
+
+test("bare search commands ask for a subject instead of searching filler words", () => {
+  for (const phrase of [
+    "coba search",
+    "search",
+    "hin, coba search dong",
+    "bisa browsing?",
+    "tolong cari",
+    "coba googling deh",
+  ]) {
+    assert.equal(isBareSearchRequest(phrase), true, phrase);
+  }
+  assert.equal(getRagMode("coba search"), "web");
+  assert.equal(isBareSearchRequest("coba search gemini terbaru"), false);
+  assert.equal(isBareSearchRequest("search harga bitcoin"), false);
+  assert.equal(extractWebSearchQuery("coba search tentang gemini 3.8 flash"), "tentang gemini 3.8 flash");
+});
+
+test("Antigravity empty result must not claim general web access is disabled", async (t) => {
+  const original = global.fetch;
+  global.fetch = async () => ({
+    ok: true,
+    json: async () => ({ provider: "antigravity", results: [] }),
+  });
+  t.after(() => { global.fetch = original; });
+  const context = await getRagContext("search arsip botani langka kabupaten garut", "live_info");
+  assert.match(context, /Antigravity Web Search sudah terkonfigurasi/);
+  assert.match(context, /belum menemukan hasil yang cocok/);
+  assert.doesNotMatch(context, /akses web umum belum aktif|TAVILY_API_KEY belum diisi/i);
+});
+
+test("Antigravity timeout/failure must not claim browsing is disabled", async (t) => {
+  const original = global.fetch;
+  global.fetch = async () => { throw new Error("simulated timeout"); };
+  t.after(() => { global.fetch = original; });
+  const context = await getRagContext("search biodiversitas pantai rancabuaya", "live_info");
+  assert.match(context, /Antigravity Web Search sudah terkonfigurasi/);
+  assert.match(context, /pencarian mengalami gangguan atau timeout/);
+  assert.doesNotMatch(context, /akses web umum belum aktif|TAVILY_API_KEY belum diisi/i);
+});
+
+test("WhatsApp handler handles bare search prompt before invoking web RAG", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const handler = fs.readFileSync(path.join(__dirname, "..", "index.js"), "utf8");
+  assert.match(handler, /if \(isBareSearchRequest\(textBody\)\)/);
+  assert.match(handler, /mau aku cariin apa nih\?/);
 });
