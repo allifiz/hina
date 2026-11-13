@@ -32,7 +32,7 @@ The GitHub workflow uses `AZURE_HOST`, `AZURE_USER`, `AZURE_SSH_KEY`, and `AZURE
 
 2. Back up the current `.env`, WhatsApp auth folder (`auth_info_baileys`), and `database.json` on the VPS before any deployment. Preserve file permissions, and do not share the backup or commit these files.
 
-3. **Important:** `database.json` is currently tracked by Git. The workflow's `git reset --hard` can overwrite runtime changes to user profiles or reminders. To keep the live database outside the checkout, create a private directory and copy the latest VPS database into it. Use the correct deployment directory first:
+3. **Important:** `database.json` is currently tracked by Git. The workflow's `git reset --hard` can overwrite runtime changes to user profiles or reminders. To keep the live database outside the checkout, create a private directory and copy the latest VPS database into it. **When you are ready to merge**, briefly stop Hina with `sudo systemctl stop hina` before making the final copy, so new messages cannot alter the source database during cutover. Keep the backup, then complete the `.env` update and merge promptly. If deployment fails, restore the backup and recover the systemd service before accepting more messages. Use the correct deployment directory first:
 
 ```bash
 APP_DIR="$(systemctl show hina -p WorkingDirectory --value)"
