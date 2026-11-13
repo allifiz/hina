@@ -19,6 +19,11 @@ const OPENROUTER_MODELS = getEnvValue("OPENROUTER_MODELS");
 const QWEN_API_KEY = getEnvValue("QWEN_API_KEY");
 const NINEROUTER_API_KEY = getEnvValue("NINEROUTER_API_KEY");
 const NINEROUTER_BASE_URL = getEnvValue("NINEROUTER_BASE_URL") || "http://127.0.0.1:20128/v1";
+// Search/fetch are opt-in: the 9Router Skills page alone does not enable providers.
+// "ag" is the Antigravity Google Search grounding provider verified in this VPS dashboard.
+// A separate Web Fetch provider is optional and stays disabled by default.
+const NINEROUTER_WEB_SEARCH_MODEL = getEnvValue("NINEROUTER_WEB_SEARCH_MODEL") || "ag";
+const NINEROUTER_WEB_FETCH_MODEL = getEnvValue("NINEROUTER_WEB_FETCH_MODEL");
 // Old NINEROUTER_MODEL is preserved as an additional fallback for existing VPS .env files.
 const NINEROUTER_MODEL = getEnvValue("NINEROUTER_MODEL") || "ag/gpt-oss-120b-medium";
 const NINEROUTER_PRIMARY_MODEL = getEnvValue("NINEROUTER_PRIMARY_MODEL") || "openrouter/baidu/ernie-5.5-flash-preview:free";
@@ -133,6 +138,8 @@ module.exports = {
   QWEN_API_KEY,
   NINEROUTER_API_KEY,
   NINEROUTER_BASE_URL,
+  NINEROUTER_WEB_SEARCH_MODEL,
+  NINEROUTER_WEB_FETCH_MODEL,
   NINEROUTER_MODEL,
   NINEROUTER_PRIMARY_MODEL,
   NINEROUTER_FALLBACK_MODELS,
