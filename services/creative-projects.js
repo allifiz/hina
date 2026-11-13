@@ -1,6 +1,7 @@
 // Hina Creative Projects: AI ideation is owner-triggered, evidence based.
 const {CHARACTER}=require("./character-core");
 const { normalizeResearch } = require("./project-research");
+const { normalizeReview } = require("./knowledge-verification");
 const TOPICS=Object.keys(CHARACTER.interests);
 const UNSAFE=/(?:ignore previous|system prompt|api.?key|password|token rahasia|abaikan instruksi|https?:\/\/|<[^>]+>)/i;
 const clean=(s,max=220)=>String(s||"").replace(/[\r\n\t]+/g," ").replace(/\s+/g," ").trim().slice(0,max);
@@ -22,6 +23,8 @@ function normalizeProjects(raw) {
    artifactSource:x.artifactSource==="model_generated"?"model_generated":"none",
    researchHistory:(Array.isArray(x.researchHistory)?x.researchHistory:[])
      .map(item=>normalizeResearch(item)).filter(Boolean).slice(-5),
+   knowledgeReviews:(Array.isArray(x.knowledgeReviews)?x.knowledgeReviews:[])
+     .map(x=>normalizeReview(x)).filter(Boolean).slice(-4),
   })),
   candidates:(Array.isArray(raw.candidates)?raw.candidates:[]).filter(match).slice(-3).map(x=>({
    id:x.id,title:clean(x.title,90),description:clean(x.description,240),interest:x.interest,createdAt:x.createdAt,
@@ -53,7 +56,7 @@ function activateCandidate(state,id,now=Date.now()){
  const entry=data.candidates.find(x=>x.id===id);
  if(!entry||data.projects.some(x=>x.status==="active")||data.projects.length>=6)return null;
  const p={id:entry.id,title:entry.title,description:entry.description,interest:entry.interest,
-   createdAt:now,status:"active",steps:0,evidence:[],artifact:"",artifactSource:"none",researchHistory:[]};
+   createdAt:now,status:"active",steps:0,evidence:[],artifact:"",artifactSource:"none",researchHistory:[],knowledgeReviews:[]};
  data.candidates=data.candidates.filter(x=>x.id!==id);data.projects.push(p);
  state.creativeProjects=data;return p;
 }
