@@ -43,6 +43,7 @@ const { getTemporalContext, getDirectTimeAnswer } = require("./services/temporal
 const { proactiveStatus } = require("./services/proactive-policy");
 const { getBeliefSummary } = require("./services/belief-value");
 const { getGoalSummary } = require("./services/character-growth");
+const { researchProject, attachResearch, formatResearch } = require("./services/project-research");
 const { projectSummary,parseProposal,createCandidate,activateCandidate,saveArtifact,
   setProjectStatus,ideationMessages,artifactMessages } = require("./services/creative-projects");
 const { teachTerm, observeLanguage, listTerms, forgetTerm, getLanguageContext, discoverUnknown, listPending, confirmCandidate, dismissCandidate } = require("./services/language-learning");
@@ -273,9 +274,24 @@ async function connectToWhatsApp() {
             saveLifeState();response = "status proyek " + item.title + ": " + newStatus;
           } else response = "tidak bisa mengubah status. proyek harus ada, dan butuh draf sebelum selesai.";
         } else if (action === "research") {
-          response = "penelitian belum dijalankan otomatis. referensi eksternal perlu dicek dan dicantumkan sumbernya sebelum dianggap fakta.";
+          const active = life.creativeProjects?.projects.find(x => x.status === "active");
+          if (!active) response = "belum ada proyek aktif. gunakan /project start ID dahulu.";
+          else {
+            const result = await researchProject(active);
+            if (result.ok && attachResearch(life, active.id, result.record)) {
+              saveLifeState();
+              response = formatResearch(active);
+            } else {
+              response = "riset belum berhasil: " + (result.reason || "tidak ada sumber yang bisa dicatat") +
+                ". Tidak ada klaim yang akan dianggap terverifikasi.";
+            }
+          }
+        } else if (action === "sources") {
+          const active = life.creativeProjects?.projects.find(x => x.id === args[2]) ||
+            life.creativeProjects?.projects.find(x => x.status === "active");
+          response = active ? formatResearch(active) : "proyek tidak ditemukan.";
         } else {
-          response = "Perintah: /project, /project ideate, /project start ID, /project write, /project show, /project pause|resume|finish, /project research.";
+          response = "Perintah: /project, /project ideate, /project start ID, /project write, /project show, /project pause|resume|finish, /project research, /project sources.";
         }
         await replyText(sock, sender, response);
         return;
