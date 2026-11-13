@@ -31,16 +31,15 @@ function detectIntent(text) {
 
 function getInstantReply(text, userName) {
   const msg = String(text || "").toLowerCase().trim();
-  const name = userName || "kak";
   if (/^\/adult\s+(on|18\+)$/.test(msg)) return "mode dewasa aktif :3 kamu bisa atur intensitasnya pakai /adult level 1-3";
   if (/^\/adult\s+off$/.test(msg)) return "mode dewasa dimatiin, balik santai lagi :3";
   if (/^\/adult\s+level\s+[0-3]$/.test(msg)) return "okee, intensitas mode dewasanya aku sesuaikan :3";
-  if (/^(p|ping|hai|hi|halo|hallo|hey|hei|woi)$/.test(msg)) return `iyaa ${name}?`;
-  if (/^(oke|ok|sip|siap|mantap|gas|gass)$/.test(msg)) return "sippp :3";
-  if (/^(wkwk|wkwkwk|haha|hehe|awok|awokwok|anjay|jir|njir)$/.test(msg)) return "wkwkwk apaa sihh :3";
-  if (/^(makasih|makasi|thanks|thank you|tq|thx)$/.test(msg)) return "iyaa sama-samaa :3";
-  if (/^(iya|iyaa|ya|yoi|betul)$/.test(msg)) return "iyaa :3";
-  if (/^(lagi apa|ngapain|hina lagi apa|hina ngapain)$/.test(msg)) return "lagi nungguin kamu chat, ehe :3";
+  if (/^(p|ping|hai|hi|halo|hallo|hey|hei|woi)$/.test(msg)) return "heii, ada apaa?";
+  if (/^(oke|ok|sip|siap|mantap|gas|gass)$/.test(msg)) return "okee, sip";
+  if (/^(wkwk|wkwkwk|haha|hehe|awok|awokwok|anjay|jir|njir)$/.test(msg)) return "ngakak apaan sih wkwk";
+  if (/^(makasih|makasi|thanks|thank you|tq|thx)$/.test(msg)) return "hehe sama-sama";
+  if (/^(iya|iyaa|ya|yoi|betul)$/.test(msg)) return "iyaa, oke";
+  if (/^(lagi apa|ngapain|hina lagi apa|hina ngapain)$/.test(msg)) return "lagi muter lagu yang nyangkut di kepala dari tadi.";
   return null;
 }
 
