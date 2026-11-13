@@ -69,7 +69,9 @@ async function search9Router(query, { news = false, maxResults = 5 } = {}) {
     model: NINEROUTER_WEB_SEARCH_MODEL,
     query: String(query || "").slice(0, 250),
     max_results: Math.max(1, Math.min(8, maxResults)),
-    search_type: news ? "news" : "web",
+    // Antigravity's verified dashboard example uses "web" search type.
+    // Its grounding search discovers current news through the dated query itself.
+    search_type: news && NINEROUTER_WEB_SEARCH_MODEL !== "ag" ? "news" : "web",
   });
   return normalizeSearchResults(data);
 }
