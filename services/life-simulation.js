@@ -9,7 +9,7 @@ const { CHARACTER } = require("./character-core");
 const { initialMotivation, normalizeMotivation, decideActivity, applyMotivation, getMotivationContext } = require("./motivation");
 const { initialBeliefState, normalizeBeliefState, reflectOnExperience, getBeliefContext, getBeliefSummary } = require("./belief-value");
 const { freshGoalState, normalizeGoalState, reflectGoal, getGoalContext, getGoalSummary } = require("./character-growth");
-const { initialProjects, normalizeProjects, advanceProject, getCreativeContext, projectSummary } = require("./creative-projects");
+const { initialProjects, normalizeProjects, advanceProject, getCreativeContext, projectSummary, discoverWeekly } = require("./creative-projects");
 
 const LIFE_FILE = process.env.HINA_LIFE_FILE || DB_FILE + ".life.json";
 const MAX_EVENTS = 90;
@@ -176,6 +176,7 @@ function tickLife(now = Date.now(), file = LIFE_FILE) {
     existing.add(key);
   }
   current.lastTickAt = now;
+  if (created.length) discoverWeekly(current, now);
   saveLifeState(file);
   if (created.length) console.info(LOG_PREFIX, created.length + " pengalaman simulasi tercatat.");
   return created;
