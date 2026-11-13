@@ -77,7 +77,7 @@ function parseNaturalTeaching(text) {
 }
 function termPattern(term) {
   // User-defined terms only contain letters, digits, spaces, hyphens, apostrophes.
-  const safe=term.replace(/[-']/g,"\\$&");
+  const safe=term; // Validated term has no regex metacharacters.
   return new RegExp("(^|[^\\p{L}\\p{N}])"+safe+"(?=$|[^\\p{L}\\p{N}])","iu");
 }
 function observeLanguage(jid,text,profile,now=Date.now(),file=LEXICON_FILE) {
