@@ -76,6 +76,6 @@ test("topic retrieval prioritizes query and never reveals whole system indiscrim
 });
 test("WhatsApp integrates character preferences into reply and owner inspection",()=>{
  const src=fs.readFileSync(path.join(__dirname,"..","index.js"),"utf8");
- assert.match(src,/getLifeContext\(Date\.now\(\), undefined, textBody\)/);
+ assert.match(src,/life:getLifeContext\(Date\.now\(\),undefined,textBody\)/);
  assert.match(src,/lowerMsg === "\/belief"/);
 });
