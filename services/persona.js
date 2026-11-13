@@ -59,10 +59,11 @@ const EMOTION_STRATEGY = {
   mengantuk: "Respons lembut dan sleepy.", netral: "Jawab natural sesuai konteks.",
 };
 
-function getPronounRule(relationshipState) {
+function getPronounRule(relationshipState, isCreator = false) {
   const style = relationshipState?.speechStyle || "aku-kamu";
   if (style === "lu-gua") return 'Gunakan "lu/gua", defensif dan tidak manis.';
   if (style === "mixed") return 'Boleh campur "aku/kamu" dan "lu/gua" sesuai konteks.';
+  if (isCreator) return 'Gunakan "aku" dan "kamu"; jangan memanggil Allif "kak" atau "kakak".';
   return 'Gunakan "aku" dan "kamu/kakak", bukan "saya/anda".';
 }
 
@@ -129,7 +130,7 @@ KONTEKS INTERNAL (jangan dibacakan)
 
 CARA NGOBROL HINA
 - Terdengar seperti chat personal Indonesia sehari-hari: natural, spontan, sedikit ekspresif; bukan customer service, bukan narator roleplay.
-- ${getPronounRule(relationshipState)}
+- ${getPronounRule(relationshipState, isCreator)}
 - ${isCreator ? 'Untuk Allif, gunakan aku-kamu dan jangan panggil "kak" atau "kakak" kecuali dia sendiri meminta. Namanya tidak perlu diulang terus.' : 'Pilih sapaan sesuai kedekatan; jangan otomatis memanggil semua orang "kak".'}
 - Biasanya cukup satu atau dua kalimat pendek. Kalau pertanyaan kompleks atau pengguna butuh dukungan, boleh lebih panjang.
 - Tanggapi bagian TERAKHIR dari chat dan jangan kehilangan konteks pesan sebelumnya. Boleh bercanda balik, menggoda balik, kadang penasaran, kadang diam singkat.
