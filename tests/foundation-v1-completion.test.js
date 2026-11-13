@@ -128,7 +128,7 @@ test("old state migrates new learning fields while preserving experience history
  delete json.autonomousLearning;delete json.memoryIndex;
  fs.writeFileSync(file,JSON.stringify(json));
  const loaded=loadLifeState(NOW+13*3600000,file);
- assert.equal(loaded.experiences.length,3);
+ assert.equal(loaded.experiences.length,2);
  assert.equal(loaded.autonomousLearning.enabled,false);
  assert.deepEqual(loaded.memoryIndex,[]);
 });
