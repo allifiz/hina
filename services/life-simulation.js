@@ -8,6 +8,7 @@ const { getWibClock } = require("./temporal");
 const { CHARACTER } = require("./character-core");
 const { initialMotivation, normalizeMotivation, decideActivity, applyMotivation, getMotivationContext } = require("./motivation");
 const { initialBeliefState, normalizeBeliefState, reflectOnExperience, getBeliefContext, getBeliefSummary } = require("./belief-value");
+const { freshGoalState, normalizeGoalState, reflectGoal, getGoalContext, getGoalSummary } = require("./character-growth");
 
 const LIFE_FILE = process.env.HINA_LIFE_FILE || DB_FILE + ".life.json";
 const MAX_EVENTS = 90;
@@ -27,6 +28,7 @@ function seedState(now = Date.now()) {
     beliefs: CHARACTER.values.slice(),
     beliefState: initialBeliefState(),
     motivation: initialMotivation(),
+    goalState: freshGoalState(now),
     interests: Object.fromEntries(INTEREST_KEYS.map((key) => [key, { affinity: 1, explored: 0, level: 0 }])),
     experiences: [],
     milestones: [],
@@ -47,7 +49,9 @@ function loadLifeState(now = Date.now(), file = LIFE_FILE) {
           interests: { ...fallback.interests, ...parsed.interests },
           beliefs: fallback.beliefs,
           beliefState: normalizeBeliefState(parsed.beliefState),
-          motivation: normalizeMotivation(parsed.motivation), // Stable character values are not user-editable chat data.
+          motivation: normalizeMotivation(parsed.motivation),
+          goalState: normalizeGoalState(parsed.goalState,
+            Number.isFinite(parsed.lastTickAt) ? parsed.lastTickAt : now, parsed.interests),
           experiences: parsed.experiences.filter((x) => x && typeof x === "object" && Number.isFinite(x.at)).slice(-MAX_EVENTS),
           milestones: Array.isArray(parsed.milestones) ? parsed.milestones.slice(-40) : [],
         };
@@ -128,6 +132,7 @@ function applyExperience(current, scheduledAt, dateKey, slotIndex) {
   current.experiences.push(event);
   current.experiences = current.experiences.slice(-MAX_EVENTS);
   reflectOnExperience(current, event);
+  reflectGoal(current, event);
   if (level > oldLevel) {
     current.milestones.push({
       at: scheduledAt,
@@ -194,6 +199,7 @@ function getLifeContext(now = Date.now(), file = LIFE_FILE, userText = "") {
     "Nilai dasar: " + current.beliefs.join("; ") + ".",
     getMotivationContext(current),
     getBeliefContext(current, userText),
+    getGoalContext(current),
     "Ketertarikan: " + interests.map((i) => CHARACTER.interests[i.key].name +
       " (pengalaman " + i.explored + ", perkembangan " + i.level + "/4)").join("; ") + ".",
     "Catatan refleksi yang BENAR-BENAR dijalankan oleh sistem simulasi:",
@@ -217,6 +223,7 @@ function getLifeSummary(now = Date.now(), file = LIFE_FILE) {
     "Milestone: " + current.milestones.length,
     "Keputusan simulasi: " + normalizeMotivation(current.motivation).decisions,
     getBeliefSummary(current),
+    getGoalSummary(current),
     "Terakhir: " + (latest ? getWibClock(latest.at).formatted +
       " | " + CHARACTER.interests[latest.interest].name + " | " + latest.activity : "belum ada"),
   ].join("\n");
