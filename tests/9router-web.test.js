@@ -13,7 +13,7 @@ const {
   search9Router,
   fetch9RouterArticle,
 } = require("../services/9router-web");
-const { getRagMode, getRagContext, isBareSearchRequest, extractWebSearchQuery } = require("../services/web");
+const { getRagMode, getRagContext, isBareSearchRequest, extractWebSearchQuery, needsPublicEventVerification } = require("../services/web");
 
 test("recognizes social trends and direct article URLs but not normal chatting", () => {
   assert.equal(getRagMode("hin, lagi rame apa sekarang?"), "news");
@@ -123,6 +123,36 @@ test("Antigravity grounding results without published_at are preserved without i
   assert.equal(results.length, 1);
   assert.equal(results[0].publishedAt, "");
   assert.equal(results[0].source, "microsoft.com");
+});
+
+
+test("public resignation and political status claims are verified as fresh news even without 'berita'", () => {
+  for (const phrase of [
+    "Gibran ngundurin diri loh",
+    "Gibran mundur?",
+    "beneran Gibran mundur?",
+    "katanya Wapres mengundurkan diri ya?",
+    "Prabowo dilantik?",
+    "Presiden dipecat?",
+    "gibran resign katanya",
+  ]) {
+    assert.equal(needsPublicEventVerification(phrase), true, phrase);
+    assert.equal(getRagMode(phrase), "news", phrase);
+  }
+  const { detectIntent } = require("../services/persona");
+  assert.equal(detectIntent("beneran Gibran mundur?"), "live_info");
+});
+
+test("ordinary personal relationship and workplace messages are not treated as breaking politics", () => {
+  for (const phrase of [
+    "aku mau resign dari kerja",
+    "pacarku dipecat",
+    "temenku ngundurin diri",
+    "aku sedih dan mau mundur",
+    "hina kamu nyebelin",
+  ]) {
+    assert.equal(needsPublicEventVerification(phrase), false, phrase);
+  }
 });
 
 test("no web search is needed for ordinary roleplay", () => {
