@@ -17,3 +17,5 @@ npm-debug.log*
 *.life.json
 *.episodes.json.tmp-*
 *.life.json.tmp-*
+*.lexicon.json
+*.lexicon.json.tmp-*
