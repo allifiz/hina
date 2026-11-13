@@ -69,6 +69,6 @@ test("WhatsApp handler captures prior user timestamp before updating profile", (
   const before = handler.indexOf("const previousUserAt = ");
   const update = handler.indexOf("const profile = updateUserProfile(");
   assert.ok(before >= 0 && before < update);
-  assert.match(handler, /getTemporalContext\(previousUserAt, Date\.now\(\)\)/);
+  assert.match(handler, /getTemporalContext\(previousUserAt,\s*Date\.now\(\)\)/);
   assert.match(handler, /getDirectTimeAnswer\(textBody, Date\.now\(\)\)/);
 });
