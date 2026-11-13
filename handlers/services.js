@@ -4,6 +4,7 @@ const { getPrimaryRouteLabel } = require("../services/ai");
 const { getLiveInfoCache, getWebInfoCache, clearCaches } = require("../services/web");
 const { isOwner } = require("../utils");
 const { getLifeState } = require("../services/life-simulation");
+const { forgetEpisode } = require("../services/episodic-memory");
 const { eligibleForProactive, chooseProactiveMessage, updateProactiveAfterSend } = require("../services/proactive-policy");
 const { memoryNotes, getMemoryNotes, rememberUserNote, forgetUserNotes } = require("../services/database");
 
@@ -332,8 +333,11 @@ async function handleOwnerCommands(sock, sender, lowerMsg, textBody, userMoods, 
     // Delete only this sender's archived conversation, never other users' data.
     chatMemory.delete(sender);
     memoryNotes.delete(sender);
+    forgetEpisode(sender, "semua");
+    const profile = userProfiles.get(sender);
+    if (profile) profile.episodeAutoOptIn = false;
     saveDatabase();
-    await replyText(sock, sender, "Riwayat chat dan catatan memorimu sudah aku hapus. Profil dan reminder tetap ada yaa :3");
+    await replyText(sock, sender, "Riwayat chat, memori, dan catatan episodikmu sudah aku hapus. Profil dan reminder tetap ada yaa :3");
     return true;
   }
   if (lowerMsg === "/help") {
