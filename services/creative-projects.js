@@ -11,7 +11,7 @@ function normalizeProjects(raw) {
  const match=x=>x&&/^[a-z0-9-]{3,80}$/.test(x.id||"")&&TOPICS.includes(x.interest)&&
   valid(x.title,90)&&valid(x.description,240)&&Number.isFinite(x.createdAt);
  return {
-  version:1,
+  version:1,lastAutoWeek:typeof raw.lastAutoWeek==="string"?raw.lastAutoWeek:null,
   projects:(Array.isArray(raw.projects)?raw.projects:[]).filter(match).slice(-6).map(x=>({
    id:x.id,title:clean(x.title,90),description:clean(x.description,240),
    interest:x.interest,createdAt:x.createdAt,status:["active","completed","paused"].includes(x.status)?x.status:"active",
@@ -90,6 +90,32 @@ function projectSummary(state){
  "Proyek: "+d.projects.length,...d.projects.map(x=>"PROYEK "+x.id+" | "+x.status+
  " | "+x.title+" | refleksi "+x.steps+" | draf "+(x.artifact?"ada":"belum"))].join("\n");
 }
+// Weekly autonomous discovery is deliberately lightweight and deterministic.
+// It proposes a *candidate* from observed interests, not a fake finished work.
+// AI remains available through explicit /project ideate; no unattended API spend.
+function discoverWeekly(state,now=Date.now()){
+ const data=normalizeProjects(state.creativeProjects);
+ const week=require("./character-growth").isoWeekKey(now);
+ if(data.lastAutoWeek===week)return null;
+ data.lastAutoWeek=week;
+ state.creativeProjects=data;
+ if(data.candidates.length>=3||data.projects.some(p=>p.status==="active"))return null;
+ const all=TOPICS.slice().sort((a,b)=>(state.interests?.[b]?.explored||0)-(state.interests?.[a]?.explored||0));
+ const first=all[0],second=all[1];
+ if(!first||!second||(state.interests?.[first]?.explored||0)<2)return null;
+ const titles={
+  watercolor:"Palet kecil dari ingatan tentang ",
+  moon:"Catatan langit yang terinspirasi dari ",
+  music:"Sketsa suasana musikal tentang ",
+  language:"Cerita mikro berbahasa Sunda tentang ",
+ };
+ const title=(titles[first]+CHARACTER.interests[second].name).slice(0,90);
+ const proposal={id:"project-"+first+"-"+week.replace(/-/g,""),interest:first,title,
+  description:"Merangkai konsep teks kreatif yang menghubungkan "+CHARACTER.interests[first].name+
+    " dan "+CHARACTER.interests[second].name+" berdasarkan refleksi simulasi.",
+  reason:"dua minat yang sering muncul dalam ingatan simulasi",createdAt:now};
+ return createCandidate(state,proposal);
+}
 function ideationMessages(state){
  const interests=Object.entries(state.interests||{}).filter(([k])=>TOPICS.includes(k))
   .map(([key,x])=>({key,explored:Number(x?.explored)||0})).sort((a,b)=>b.explored-a.explored).slice(0,4);
@@ -106,4 +132,4 @@ function artifactMessages(project){
  ];
 }
 module.exports={initialProjects,normalizeProjects,parseProposal,createCandidate,activateCandidate,
- advanceProject,saveArtifact,setProjectStatus,getCreativeContext,projectSummary,ideationMessages,artifactMessages};
+ advanceProject,saveArtifact,setProjectStatus,getCreativeContext,projectSummary,ideationMessages,artifactMessages,discoverWeekly};
