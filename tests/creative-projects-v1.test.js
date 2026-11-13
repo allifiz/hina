@@ -88,7 +88,7 @@ test("one project at a time, bounded memory and valid project status transitions
 test("WhatsApp /project commands and state storage are wired",()=>{
  const handler=fs.readFileSync(path.join(__dirname,"..","index.js"),"utf8");
  const life=fs.readFileSync(path.join(__dirname,"..","services","life-simulation.js"),"utf8");
- assert.match(handler,/lowerMsg.*\/project/);
+ assert.match(handler,/if \(\/\^\\\/project/);
  assert.match(handler,/parseProposal\(/);
  assert.match(handler,/saveArtifact\(/);
  assert.match(life,/advanceProject\(current, event\)/);
