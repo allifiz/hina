@@ -1,4 +1,6 @@
 const {
+  nineRouterClient,
+  NINEROUTER_MODEL,
   localClient,
   openRouterClient,
   qwenClient,
@@ -11,6 +13,7 @@ const {
 const { extractTextContent, shouldSwitchModel, buildCompletionPayload } = require("../utils");
 
 let providerState = {
+  ninerouter: 0,
   local: 0,
   openrouter: 0,
   qwen: 0,
@@ -22,6 +25,16 @@ function isTextChatModel(model) {
 
 function getProviderCandidates() {
   const providers = [];
+
+  // 9Router first: route text chat to the already-tested local proxy.
+  if (nineRouterClient && NINEROUTER_MODEL) {
+    providers.push({
+      name: "ninerouter",
+      label: "9Router",
+      client: nineRouterClient,
+      models: [NINEROUTER_MODEL],
+    });
+  }
 
   // Local llama.cpp is the default route for normal text chat.
   if (localClient && LOCAL_AVAILABLE_MODELS.length > 0) {
@@ -67,6 +80,9 @@ function selectReasoningRoute(text, userIntent, userEmotion) {
   const msg = String(text || "")
     .toLowerCase()
     .trim();
+
+  // Web RAG runs before generation, so live-info questions can also use 9Router.
+  if (nineRouterClient) return "ninerouter";
 
   const longText = msg.length > 350;
   const emotionalHeavy = ["sedih", "capek", "cemas", "kesepian", "marah"].includes(userEmotion);
@@ -152,6 +168,16 @@ function prepareMessagesForProvider(messages, providerName) {
 }
 
 function buildPayloadForProvider(provider, model, messages, userIntent) {
+  // Keep the OpenAI-compatible payload minimal for GPT-OSS via Antigravity.
+  // Provider-specific sampling options can cause avoidable 400 errors.
+  if (provider.name === "ninerouter") {
+    return {
+      model,
+      messages: prepareMessagesForProvider(messages, provider.name),
+      stream: false,
+    };
+  }
+
   const payload = buildCompletionPayload(model, prepareMessagesForProvider(messages, provider.name), userIntent);
 
   if (provider.name === "local") {
