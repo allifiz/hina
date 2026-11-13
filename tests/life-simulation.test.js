@@ -112,7 +112,7 @@ test("WhatsApp starts independent life scheduler and supplies life experience to
   const entry = fs.readFileSync(path.join(__dirname, "..", "index.js"), "utf8");
   assert.match(entry, /startLifeSimulation\(\)/);
   assert.match(entry, /tickLife\(\)/);
-  assert.match(entry, /getLifeContext\(\)/);
+  assert.match(entry, /getLifeContext\(Date\.now\(\), undefined, textBody\)/);
   assert.match(entry, /getLifeSummary\(\)/);
   assert.match(entry, /setLifePaused\(/);
 });
