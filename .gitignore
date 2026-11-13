@@ -11,3 +11,9 @@ creds.json
 *.db
 *.sqlite
 npm-debug.log*
+
+# Runtime private state (never commit user episodic or life history)
+*.episodes.json
+*.life.json
+*.episodes.json.tmp-*
+*.life.json.tmp-*
