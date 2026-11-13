@@ -16,7 +16,7 @@ const webInfoCache = new Map();
 // Avoid routing someone's personal resignation, grief, or everyday chat into news search.
 function needsPublicEventVerification(text) {
   const msg = String(text || "").toLowerCase();
-  const publicRole = /\b(wapres|wakil presiden|presiden|menteri|pejabat|gubernur|bupati|wali kota|walikota|kepala negara|anggota dpr|anggota mpr)\b/.test(msg);
+  const publicRole = /\b(wapres|wakil presiden|presiden|menteri|pejabat|gubernur|bupati|wali kota|walikota|kepala negara|anggota dpr|anggota mpr|gibran|prabowo|jokowi|dpr|mpr|kpk)\b/.test(msg);
   const publicEvent = /\b(mundur|mengundurkan diri|ngundurin diri|resign|dicopot|diberhentikan|dipecat|dilantik|dimakzulkan|pemakzulan|ditahan|ditangkap|wafat|meninggal)\b/.test(msg);
   const personalTopic = /\b(aku|saya|gue|gua|gw|ku|kamu|pacarku|temanku|temenku|kerjaku|bosku)\b/.test(msg);
   const rumorCheck = /\b(beneran|benarkah|bener ga|bener gak|bener nggak|katanya|kabarnya|serius|hoaks|hoax|fakta|rumor)\b/.test(msg);
