@@ -22,7 +22,17 @@ const {
 } = require("./utils");
 
 // Database
-const { userProfiles, getUserProfile, updateUserProfile, loadDatabase, saveDatabase, getReminders } = require("./services/database");
+const {
+  userProfiles,
+  chatHistories,
+  updateUserProfile,
+  appendChatMessage,
+  getRecentChatMessages,
+  getRelevantChatMemories,
+  loadDatabase,
+  saveDatabase,
+  getReminders,
+} = require("./services/database");
 
 // AI Services
 const { getProviderCandidates, getPrimaryRouteLabel, selectReasoningRoute, getReplyFromProviders } = require("./services/ai");
@@ -36,6 +46,8 @@ const { downloadBaileysMedia, transcribeAudioWithQwen, analyzeIncomingImage, gen
 // Persona & Intent
 const { detectUserEmotion, detectIntent, getInstantReply, getRelationshipMode, getHinaPersona } = require("./services/persona");
 const { updateRelationshipState, getRelationshipContext, shouldUseInstantReply } = require("./services/relationship");
+const { getHinaReplyStyle } = require("./services/persona");
+const { resolveHinaMood } = require("./services/mood");
 
 // Handlers
 const { startReminderService, startProactiveMessaging, handleOwnerCommands } = require("./handlers/services");
@@ -43,7 +55,7 @@ const { startReminderService, startProactiveMessaging, handleOwnerCommands } = r
 const { startTyping, replyText, replyWithPreferredFormat } = require("./handlers/messages");
 
 // Global state
-const chatMemory = new Map();
+const chatMemory = chatHistories; // Persisted in DB_FILE, including after process restarts.
 const userMoods = new Map();
 let reminders = null;
 let isServicesStarted = false;
@@ -173,7 +185,7 @@ async function connectToWhatsApp() {
       )
         return;
 
-      const currentMood = userMoods.get(sender) || (isOwner(sender) ? "senang" : "ceria");
+      const currentMood = userMoods.get(sender) || userProfiles.get(sender)?.currentMood || (isOwner(sender) ? "senang" : "ceria");
       const userEmotion = detectUserEmotion(textBody || "gambar");
       const userIntent = mediaDescriptor?.kind === "image" ? "analisis_gambar" : detectIntent(textBody || "");
       const preferredProvider = selectReasoningRoute(textBody || "gambar", userIntent, userEmotion);
@@ -212,9 +224,11 @@ async function connectToWhatsApp() {
 
       const instantReply = getInstantReply(textBody, userName);
       if (instantReply && userIntent === "short_reply" && shouldUseInstantReply(relationshipState)) {
+        appendChatMessage(sender, "user", textBody);
         await replyWithPreferredFormat(sock, sender, instantReply, {
           voiceReply: shouldReplyAsVoice,
         });
+        appendChatMessage(sender, "assistant", instantReply);
         return;
       }
 
@@ -229,13 +243,9 @@ async function connectToWhatsApp() {
         return;
       }
 
-      if (!chatMemory.has(sender)) chatMemory.set(sender, []);
-      const history = chatMemory.get(sender);
-      history.push({
-        role: "user",
-        content: textBody,
-      });
-      if (history.length > MAX_HISTORY) history.splice(0, history.length - MAX_HISTORY);
+      appendChatMessage(sender, "user", textBody);
+      const history = getRecentChatMessages(sender, MAX_HISTORY);
+      const relevantMemory = getRelevantChatMemories(sender, textBody, MAX_HISTORY);
 
       let liveContext = "";
 
@@ -262,7 +272,7 @@ async function connectToWhatsApp() {
               isOwner,
               OWNER_NAME: require("./config").OWNER_NAME,
               PARTNER_NAME: require("./config").PARTNER_NAME,
-            }) + liveContext,
+            }) + relevantMemory + liveContext,
         },
         ...history,
       ];
@@ -287,20 +297,25 @@ async function connectToWhatsApp() {
       }
 
       const { mood: aiMood, reply } = extractMoodAndCleanReply(rawReply);
-      const finalMood = stabilizeMood(moodForPrompt, userEmotion, aiMood);
+      const finalMood = resolveHinaMood({
+        previousMood: moodForPrompt,
+        aiMood,
+        userEmotion,
+        userIntent,
+        replyStyle: getHinaReplyStyle(textBody, userIntent, userEmotion),
+        relationshipState,
+      });
       const cleanReply = cleanBotReply(reply);
       userMoods.set(sender, finalMood);
+      profile.currentMood = finalMood;
+      saveDatabase();
       console.log(`Mood ${sender} berubah menjadi: ${finalMood}`);
       console.log(`Self-respect ${sender}: ${relationshipState.stage} (${Math.round(relationshipState.tensionLevel || 0)}/100)`);
       console.log(`Balasan dibuat via ${generationResult.providerLabel} (${generationResult.model})`);
-      history.push({
-        role: "assistant",
-        content: cleanReply,
-      });
-      if (history.length > MAX_HISTORY) history.splice(0, history.length - MAX_HISTORY);
       await replyWithPreferredFormat(sock, sender, cleanReply, {
         voiceReply: shouldReplyAsVoice,
       });
+      appendChatMessage(sender, "assistant", cleanReply);
     } catch (error) {
       console.error("Terjadi kesalahan API:", error.message || error);
       await replyText(sock, sender, "ih, kok tiba-tiba lemot ya... aku lagi error nih kak >w< bentar lagi coba lagi ya...");
