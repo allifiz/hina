@@ -61,6 +61,12 @@ test("observations improve confidence gradually, not in a burst of repeated mess
  assert.equal(listTerms("a@lid",file)[0].observedCount,2);
  assert.equal(relevantTerms("a@lid","apa kabar?",file)[0].term,"ngabrut");
 });
+test("hyphenated slang is matched without regex errors",t=>{
+ const file=setup(t);
+ assert.equal(teachTerm("a@lid","ga-jelas","tingkah yang tidak masuk akal","",{file}).ok,true);
+ assert.equal(relevantTerms("a@lid","ih ga-jelas amat",file)[0].term,"ga-jelas");
+ assert.equal(observeLanguage("a@lid","ga-jelas banget",{languageAutoOptIn:true},NOW+3600000,file).ok,true);
+});
 test("malicious and overlong dictionary entries are not stored",t=>{
  const file=setup(t);
  const bad=[
