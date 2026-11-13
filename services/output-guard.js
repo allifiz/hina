@@ -27,10 +27,14 @@ function stripInternalPreamble(reply) {
 
   const lines = original.split(/\r?\n/);
   let at = 0;
-  while (at < lines.length && (META_LINE.test(lines[at].trim()) || !lines[at].trim())) at++;
-  // When metadata is spread over unlabelled continuation lines, don't leak it.
-  // Only release standalone content after a blank-line separator.
-  if (at < lines.length && at > 0 && !META_LINE.test(lines[at].trim())) {
+  let sawSeparator = false;
+  while (at < lines.length && (META_LINE.test(lines[at].trim()) || !lines[at].trim())) {
+    if (!lines[at].trim()) sawSeparator = true;
+    at++;
+  }
+  // Metadata may wrap across multiple unlabelled lines.
+  // Release unlabelled text only if a blank line separated it from the meta block.
+  if (sawSeparator && at < lines.length && !META_LINE.test(lines[at].trim())) {
     const candidate = lines.slice(at).join("\n").trim();
     if (!/(?:\bKonteks:\s*(?:User|Pengguna)|\bNuansa pesan:|\bBatasan:)/i.test(candidate)) {
       return candidate;
