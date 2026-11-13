@@ -9,6 +9,7 @@ const { CHARACTER } = require("./character-core");
 const { initialMotivation, normalizeMotivation, decideActivity, applyMotivation, getMotivationContext } = require("./motivation");
 const { initialBeliefState, normalizeBeliefState, reflectOnExperience, getBeliefContext, getBeliefSummary } = require("./belief-value");
 const { freshGoalState, normalizeGoalState, reflectGoal, getGoalContext, getGoalSummary } = require("./character-growth");
+const { initialProjects, normalizeProjects, advanceProject, getCreativeContext, projectSummary, discoverWeekly } = require("./creative-projects");
 
 const LIFE_FILE = process.env.HINA_LIFE_FILE || DB_FILE + ".life.json";
 const MAX_EVENTS = 90;
@@ -29,6 +30,7 @@ function seedState(now = Date.now()) {
     beliefState: initialBeliefState(),
     motivation: initialMotivation(),
     goalState: freshGoalState(now),
+    creativeProjects: initialProjects(),
     interests: Object.fromEntries(INTEREST_KEYS.map((key) => [key, { affinity: 1, explored: 0, level: 0 }])),
     experiences: [],
     milestones: [],
@@ -52,6 +54,7 @@ function loadLifeState(now = Date.now(), file = LIFE_FILE) {
           motivation: normalizeMotivation(parsed.motivation),
           goalState: normalizeGoalState(parsed.goalState,
             Number.isFinite(parsed.lastTickAt) ? parsed.lastTickAt : now, parsed.interests),
+          creativeProjects: normalizeProjects(parsed.creativeProjects),
           experiences: parsed.experiences.filter((x) => x && typeof x === "object" && Number.isFinite(x.at)).slice(-MAX_EVENTS),
           milestones: Array.isArray(parsed.milestones) ? parsed.milestones.slice(-40) : [],
         };
@@ -133,6 +136,7 @@ function applyExperience(current, scheduledAt, dateKey, slotIndex) {
   current.experiences = current.experiences.slice(-MAX_EVENTS);
   reflectOnExperience(current, event);
   reflectGoal(current, event);
+  advanceProject(current, event);
   if (level > oldLevel) {
     current.milestones.push({
       at: scheduledAt,
@@ -172,6 +176,7 @@ function tickLife(now = Date.now(), file = LIFE_FILE) {
     existing.add(key);
   }
   current.lastTickAt = now;
+  if (created.length) discoverWeekly(current, now);
   saveLifeState(file);
   if (created.length) console.info(LOG_PREFIX, created.length + " pengalaman simulasi tercatat.");
   return created;
@@ -200,6 +205,7 @@ function getLifeContext(now = Date.now(), file = LIFE_FILE, userText = "") {
     getMotivationContext(current),
     getBeliefContext(current, userText),
     getGoalContext(current),
+    getCreativeContext(current),
     "Ketertarikan: " + interests.map((i) => CHARACTER.interests[i.key].name +
       " (pengalaman " + i.explored + ", perkembangan " + i.level + "/4)").join("; ") + ".",
     "Catatan refleksi yang BENAR-BENAR dijalankan oleh sistem simulasi:",
@@ -224,6 +230,7 @@ function getLifeSummary(now = Date.now(), file = LIFE_FILE) {
     "Keputusan simulasi: " + normalizeMotivation(current.motivation).decisions,
     getBeliefSummary(current),
     getGoalSummary(current),
+    projectSummary(current),
     "Terakhir: " + (latest ? getWibClock(latest.at).formatted +
       " | " + CHARACTER.interests[latest.interest].name + " | " + latest.activity : "belum ada"),
   ].join("\n");
@@ -246,7 +253,7 @@ function stopLifeSimulation() {
 }
 
 module.exports = {
-  LIFE_FILE, seedState, loadLifeState, getLifeState, chooseActivity,
+  LIFE_FILE, seedState, loadLifeState, getLifeState, saveLifeState, chooseActivity,
   tickLife, setLifePaused, getLifeContext, getLifeSummary,
   startLifeSimulation, stopLifeSimulation,
 };

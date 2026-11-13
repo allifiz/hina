@@ -43,12 +43,14 @@ const { getTemporalContext, getDirectTimeAnswer } = require("./services/temporal
 const { proactiveStatus } = require("./services/proactive-policy");
 const { getBeliefSummary } = require("./services/belief-value");
 const { getGoalSummary } = require("./services/character-growth");
+const { projectSummary,parseProposal,createCandidate,activateCandidate,saveArtifact,
+  setProjectStatus,ideationMessages,artifactMessages } = require("./services/creative-projects");
 const { teachTerm, observeLanguage, listTerms, forgetTerm, getLanguageContext, discoverUnknown, listPending, confirmCandidate, dismissCandidate } = require("./services/language-learning");
 const { getExpressionContext, recordExpression } = require("./services/character-expression");
 const { getLifeState } = require("./services/life-simulation");
 const { captureIfOptedIn, addEpisode, getEpisodicContext, getEpisodeList, forgetEpisode } = require("./services/episodic-memory");
 const {
-  startLifeSimulation, tickLife, getLifeContext, getLifeSummary, setLifePaused,
+  startLifeSimulation, tickLife, getLifeContext, getLifeSummary, setLifePaused, saveLifeState,
 } = require("./services/life-simulation");
 
 // Media Services
@@ -221,6 +223,63 @@ async function connectToWhatsApp() {
       tickLife();
 
       const lowerMsg = textBody.toLowerCase();
+      if (/^\/project(?:\s|$)/.test(lowerMsg)) {
+        if (!isOwner(sender)) {
+          await replyText(sock, sender, "fitur proyek karakter ini khusus pemilik ya.");
+          return;
+        }
+        const args = textBody.trim().split(/\s+/);
+        const action = (args[1] || "list").toLowerCase();
+        const life = getLifeState();
+        let response = "";
+        if (action === "list" || action === "status") {
+          response = projectSummary(life);
+        } else if (action === "ideate") {
+          // Exactly one explicit AI request; no unattended spending or auto-posting.
+          const result = await getReplyFromProviders(ideationMessages(life), "ngobrol", "ninerouter", "creative goal", "netral");
+          const candidate = parseProposal(result.rawReply || "", Date.now());
+          const accepted = candidate ? createCandidate(life, candidate) : null;
+          if (accepted) {
+            saveLifeState();
+            response = "Ide baru: " + accepted.title + "\n" + accepted.description +
+              "\nID: " + accepted.id + "\nAktifkan dengan /project start " + accepted.id;
+          } else response = "belum berhasil menghasilkan ide valid. gak akan kubikin-bikin hasilnya.";
+        } else if (action === "start") {
+          const item = activateCandidate(life, args[2]);
+          if (item) { saveLifeState(); response = "proyek aktif: " + item.title; }
+          else response = "kandidat tidak ada atau masih ada proyek aktif. cek /project.";
+        } else if (action === "write") {
+          const active = life.creativeProjects?.projects.find(x => x.status === "active");
+          if (!active) response = "belum ada proyek aktif. pilih kandidat lewat /project start ID.";
+          else if (active.artifact) response = "draf proyek ini sudah ada. lihat lewat /project show.";
+          else {
+            const result = await getReplyFromProviders(artifactMessages(active), "ngobrol", "ninerouter", "creative writing", "netral");
+            const draft = String(result.rawReply || "").replace(/\[mood:[^\]]+\]/gi, "").trim();
+            const saved = saveArtifact(life, active.id, draft);
+            if (saved) { saveLifeState(); response = "draf karya teks berhasil dibuat:\n\n" + saved.artifact; }
+            else response = "belum ada draf valid dari model, jadi tidak ada karya yang kusimpan.";
+          }
+        } else if (action === "show") {
+          const item = life.creativeProjects?.projects.find(x => x.id === args[2]) ||
+            life.creativeProjects?.projects.find(x => x.status === "active");
+          response = item ? item.title + "\nStatus: " + item.status + "\n" +
+            (item.artifact || "belum ada draf teks; /project write untuk membuatnya.") :
+            "proyek tidak ditemukan.";
+        } else if (["pause","resume","finish"].includes(action)) {
+          const item = life.creativeProjects?.projects.find(x => x.id === args[2]) ||
+            life.creativeProjects?.projects.find(x => x.status === "active");
+          const newStatus = {pause:"paused",resume:"active",finish:"completed"}[action];
+          if (item && setProjectStatus(life,item.id,newStatus)) {
+            saveLifeState();response = "status proyek " + item.title + ": " + newStatus;
+          } else response = "tidak bisa mengubah status. proyek harus ada, dan butuh draf sebelum selesai.";
+        } else if (action === "research") {
+          response = "penelitian belum dijalankan otomatis. referensi eksternal perlu dicek dan dicantumkan sumbernya sebelum dianggap fakta.";
+        } else {
+          response = "Perintah: /project, /project ideate, /project start ID, /project write, /project show, /project pause|resume|finish, /project research.";
+        }
+        await replyText(sock, sender, response);
+        return;
+      }
       if (lowerMsg === "/goals") {
         if (!isOwner(sender)) {
           await replyText(sock, sender, "ringkasan perkembangan karakter ini khusus pemilik ya.");
