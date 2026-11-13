@@ -30,6 +30,9 @@ jobs:
 
             echo "Checking syntax..."
             node --check index.js
+            node --check config.js
+            node --check services/ai.js
+            npm test
 
             echo "Restarting Hina service..."
             sudo -n systemctl restart hina
