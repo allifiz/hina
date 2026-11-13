@@ -37,7 +37,8 @@ function decideActivity(state, dateKey, slotIndex) {
     const previous=state.experiences.slice(-2).filter(x => x.interest===key).length;
     const drive = key==="watercolor" ? "creativity" : key==="music" ? "expression" :
       key==="language" ? "curiosity" : "reflection";
-    const score= motivation.drives[drive]*1.2 + interest*0.4 +
+    const goalFocusBonus=state.goalState?.focus===key && !state.goalState?.goals?.[key]?.completed ? 0.32 : 0;
+    const score= motivation.drives[drive]*1.2 + interest*0.4 + goalFocusBonus +
       novelty*0.22 + mixHash(dateKey+":"+slotIndex+":"+key)*0.6 -
       previous*1.1 - (motivation.recentFocus===key?0.15:0);
     return {key,drive,score};

@@ -42,6 +42,7 @@ const { getRagMode, getRagContext, isBareSearchRequest } = require("./services/w
 const { getTemporalContext, getDirectTimeAnswer } = require("./services/temporal");
 const { proactiveStatus } = require("./services/proactive-policy");
 const { getBeliefSummary } = require("./services/belief-value");
+const { getGoalSummary } = require("./services/character-growth");
 const { teachTerm, observeLanguage, listTerms, forgetTerm, getLanguageContext, discoverUnknown, listPending, confirmCandidate, dismissCandidate } = require("./services/language-learning");
 const { getExpressionContext, recordExpression } = require("./services/character-expression");
 const { getLifeState } = require("./services/life-simulation");
@@ -220,6 +221,14 @@ async function connectToWhatsApp() {
       tickLife();
 
       const lowerMsg = textBody.toLowerCase();
+      if (lowerMsg === "/goals") {
+        if (!isOwner(sender)) {
+          await replyText(sock, sender, "ringkasan perkembangan karakter ini khusus pemilik ya.");
+        } else {
+          await replyText(sock, sender, getGoalSummary(getLifeState()));
+        }
+        return;
+      }
       if (lowerMsg === "/belief") {
         if (!isOwner(sender)) {
           await replyText(sock, sender, "ringkasan perkembangan karakter ini khusus pemilik ya.");
