@@ -27,6 +27,12 @@ test("old profiles/reminders migrate safely; chat history survives reload and st
   assert.equal(db.getReminders().length, 1);
   assert.equal(db.getRecentChatMessages(jid).length, 0);
 
+  assert.equal(db.rememberUserNote(jid, "aku suka melukis bulan"), true);
+  assert.equal(db.rememberUserNote(jid, "aku suka melukis bulan"), false);
+  assert.deepEqual(db.getMemoryNotes(jid), ["aku suka melukis bulan"]);
+  assert.deepEqual(db.getMemoryNotes(other), []);
+  assert.match(db.getRelevantChatMemories(jid, "apa yang aku suka?", 8), /FAKTA YANG DIMINTA USER/);
+
   db.appendChatMessage(jid, "user", "aku suka melukis bulan");
   db.appendChatMessage(jid, "assistant", "ih bulan cantik banget ya");
   for (let index = 0; index < 7; index++) {
@@ -44,6 +50,9 @@ test("old profiles/reminders migrate safely; chat history survives reload and st
   assert.equal(reloaded.getRecentChatMessages(jid, 20).length, 16);
   assert.equal(reloaded.userProfiles.get(jid).messageCount, 11);
   assert.equal(reloaded.getReminders()[0].message, "test reminder");
+  assert.deepEqual(reloaded.getMemoryNotes(jid), ["aku suka melukis bulan"]);
+  assert.equal(reloaded.forgetUserNotes(other, "suka"), 0);
+
   assert.equal(fs.statSync(file).mode & 0o777, 0o600);
 
   for (let index = 0; index < 30; index++) {
@@ -52,13 +61,19 @@ test("old profiles/reminders migrate safely; chat history survives reload and st
   assert.equal(reloaded.getChatHistory(jid).length, 20);
   assert.deepEqual(Object.keys(reloaded.getRecentChatMessages(jid, 2)[0]).sort(), ["content", "role"]);
 
-  // /resetme uses the same per-user Map.delete + saveDatabase behavior.
+  assert.equal(reloaded.forgetUserNotes(jid, "bulan"), 1);
+  assert.deepEqual(reloaded.getMemoryNotes(jid), []);
+  assert.equal(reloaded.rememberUserNote(jid, "aku suka astronomi"), true);
+
+  // /resetme uses the same per-user map deletion + saveDatabase behavior.
   reloaded.chatHistories.delete(jid);
+  reloaded.memoryNotes.delete(jid);
   reloaded.saveDatabase();
   delete require.cache[reloadedPath];
   const cleared = require("../services/database");
   cleared.loadDatabase();
   assert.equal(cleared.getRecentChatMessages(jid).length, 0);
+  assert.deepEqual(cleared.getMemoryNotes(jid), []);
   assert.equal(cleared.userProfiles.get(jid).name, "Tester");
   assert.equal(cleared.getReminders().length, 1);
 });
