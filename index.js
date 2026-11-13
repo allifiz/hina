@@ -40,6 +40,7 @@ const { getProviderCandidates, getPrimaryRouteLabel, selectReasoningRoute, getRe
 // Web Services
 const { getRagMode, getRagContext, isBareSearchRequest } = require("./services/web");
 const { getTemporalContext, getDirectTimeAnswer } = require("./services/temporal");
+const { proactiveStatus } = require("./services/proactive-policy");
 const {
   startLifeSimulation, tickLife, getLifeContext, getLifeSummary, setLifePaused,
 } = require("./services/life-simulation");
@@ -262,6 +263,16 @@ async function connectToWhatsApp() {
       const relationshipMode = getRelationshipMode(sender, profile, isOwner, extractNumberFromJid);
       const moodForPrompt = getMoodForRelationship(currentMood, relationshipState);
       saveDatabase();
+
+      // Opt-in is per recipient, reversible, and OFF by default. The old
+      // proactive timer must never message someone merely for being close.
+      if (/^\/proactive(?:\s+(?:on|off|status))?$/.test(lowerMsg)) {
+        if (lowerMsg === "/proactive on") profile.proactiveOptIn = true;
+        if (lowerMsg === "/proactive off") profile.proactiveOptIn = false;
+        if (lowerMsg === "/proactive on" || lowerMsg === "/proactive off") saveDatabase();
+        await replyText(sock, sender, proactiveStatus(profile));
+        return;
+      }
 
       if (mediaIsAudio && !textBody) {
         await replyWithPreferredFormat(sock, sender, "aku dengerin tadi, tapi belum nangkep isinya jelas ;w; coba VN yang lebih jelas yaa", {

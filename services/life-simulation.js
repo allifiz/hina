@@ -6,6 +6,7 @@ const path = require("node:path");
 const { DB_FILE } = require("../config");
 const { getWibClock } = require("./temporal");
 const { CHARACTER } = require("./character-core");
+const { initialMotivation, normalizeMotivation, decideActivity, applyMotivation, getMotivationContext } = require("./motivation");
 
 const LIFE_FILE = process.env.HINA_LIFE_FILE || DB_FILE + ".life.json";
 const MAX_EVENTS = 90;
@@ -23,6 +24,7 @@ function seedState(now = Date.now()) {
     lastTickAt: now,
     paused: false,
     beliefs: CHARACTER.values.slice(),
+    motivation: initialMotivation(),
     interests: Object.fromEntries(INTEREST_KEYS.map((key) => [key, { affinity: 1, explored: 0, level: 0 }])),
     experiences: [],
     milestones: [],
@@ -41,7 +43,8 @@ function loadLifeState(now = Date.now(), file = LIFE_FILE) {
           ...fallback,
           ...parsed,
           interests: { ...fallback.interests, ...parsed.interests },
-          beliefs: fallback.beliefs, // Stable character values are not user-editable chat data.
+          beliefs: fallback.beliefs,
+          motivation: normalizeMotivation(parsed.motivation), // Stable character values are not user-editable chat data.
           experiences: parsed.experiences.filter((x) => x && typeof x === "object" && Number.isFinite(x.at)).slice(-MAX_EVENTS),
           milestones: Array.isArray(parsed.milestones) ? parsed.milestones.slice(-40) : [],
         };
@@ -92,24 +95,12 @@ function hashKey(value) {
 // Decision Engine V1: picks simulated activities using current interest affinity,
 // not based on latest user message, and does not fabricate physical whereabouts.
 function chooseActivity(current, dateKey, slotIndex) {
-  const ranked = INTEREST_KEYS.map((key, index) => {
-    const item = current.interests[key] || { affinity: 1, explored: 0, level: 0 };
-    const affinity = Math.max(0.5, Math.min(4, Number(item.affinity) || 1));
-    const randomPart = hashKey(dateKey + ":" + slotIndex + ":" + key) % 1000 / 1000;
-    const repetitionPenalty = current.experiences.slice(-2).filter((x) => x.interest === key).length * 1.5;
-    return { key, score: affinity * 0.28 + randomPart * 1.8 - repetitionPenalty - index * 0.01 };
-  }).sort((a, b) => b.score - a.score);
-  const key = ranked[0].key;
-  const description = CHARACTER.interests[key];
-  const currentInterest = current.interests[key] || { affinity: 1, explored: 0, level: 0 };
-  const activityIndex = (hashKey(dateKey + ":" + slotIndex + ":activity:" + key) +
-    (Number(currentInterest.explored) || 0)) % description.activities.length;
-  const [activity, reflection] = description.activities[activityIndex];
-  return { key, activity, reflection };
+  return decideActivity(current, dateKey, slotIndex);
 }
 
 function applyExperience(current, scheduledAt, dateKey, slotIndex) {
-  const { key, activity, reflection } = chooseActivity(current, dateKey, slotIndex);
+  const decision = chooseActivity(current, dateKey, slotIndex);
+  const { key, activity, reflection } = decision;
   const old = current.interests[key] || { affinity: 1, explored: 0, level: 0 };
   const explored = Math.max(0, Number(old.explored) || 0) + 1;
   const oldLevel = Math.max(0, Number(old.level) || 0);
@@ -127,7 +118,10 @@ function applyExperience(current, scheduledAt, dateKey, slotIndex) {
     interest: key,
     activity,
     reflection,
+    motive: decision.drive,
+    reason: decision.reason,
   };
+  applyMotivation(current, decision);
   current.experiences.push(event);
   current.experiences = current.experiences.slice(-MAX_EVENTS);
   if (level > oldLevel) {
@@ -194,6 +188,7 @@ function getLifeContext(now = Date.now(), file = LIFE_FILE) {
     "KEHIDUPAN KARAKTER HINA (simulasi fiksi, bukan kejadian fisik; jangan dibacakan):",
     "Identitas: Hina, gadis karakter 21 tahun, Sunda, dari Pameungpeuk Garut; ceria, penasaran, kadang pemalu, jahil, mandiri, dan manja.",
     "Nilai dasar: " + current.beliefs.join("; ") + ".",
+    getMotivationContext(current),
     "Ketertarikan: " + interests.map((i) => CHARACTER.interests[i.key].name +
       " (pengalaman " + i.explored + ", perkembangan " + i.level + "/4)").join("; ") + ".",
     "Catatan refleksi yang BENAR-BENAR dijalankan oleh sistem simulasi:",
@@ -215,6 +210,7 @@ function getLifeSummary(now = Date.now(), file = LIFE_FILE) {
     "Life Simulation: " + (current.paused ? "paused" : "aktif"),
     "Pengalaman: " + current.experiences.length,
     "Milestone: " + current.milestones.length,
+    "Keputusan simulasi: " + normalizeMotivation(current.motivation).decisions,
     "Terakhir: " + (latest ? getWibClock(latest.at).formatted +
       " | " + CHARACTER.interests[latest.interest].name + " | " + latest.activity : "belum ada"),
   ].join("\n");

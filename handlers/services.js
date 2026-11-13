@@ -3,6 +3,8 @@ const { sendVoiceReply } = require("../services/media");
 const { getPrimaryRouteLabel } = require("../services/ai");
 const { getLiveInfoCache, getWebInfoCache, clearCaches } = require("../services/web");
 const { isOwner } = require("../utils");
+const { getLifeState } = require("../services/life-simulation");
+const { eligibleForProactive, chooseProactiveMessage, updateProactiveAfterSend } = require("../services/proactive-policy");
 const { memoryNotes, getMemoryNotes, rememberUserNote, forgetUserNotes } = require("../services/database");
 
 function startReminderService(sock, reminders, saveDatabase) {
@@ -31,33 +33,40 @@ function startReminderService(sock, reminders, saveDatabase) {
 }
 
 function startProactiveMessaging(sock, userProfiles, saveDatabase) {
-  setInterval(async () => {
-    const now = Date.now();
-    for (const [jid, profile] of userProfiles.entries()) {
-      if (profile.banned || profile.muted) continue;
-      if (profile.intimacy < 5) continue;
-      const hoursSinceLastChat = (now - profile.lastInteractionAt) / (1000 * 60 * 60);
-      if (hoursSinceLastChat <= 24 || hoursSinceLastChat >= 48) continue;
-      if (profile.lastProactiveAt && now - profile.lastProactiveAt < 86400000) continue;
-      const manjaMessages = [
-        "Hii... sibuk banget yaa hari inii? Kok aku ditinggalin ajaa ;w;",
-        "Pstt... lagi ngapain sihh? Udah lupa ya sama akuu? >:/",
-        "Haloo! Cuma mau ngingetin jangan lupa makan yaaa hari inii! :3",
-      ];
-      try {
-        const randomMsg = manjaMessages[Math.floor(Math.random() * manjaMessages.length)];
-        await sock.sendMessage(jid, {
-          text: randomMsg,
-        });
-        profile.lastProactiveAt = now;
-        profile.lastInteractionAt = now;
-        userProfiles.set(jid, profile);
-        saveDatabase();
-      } catch (error) {
-        console.error("[Proactive] Gagal ngirim pesan:", error.message);
+  // This timer is deliberately silent until a recipient explicitly opts in.
+  // After restart, opt-ins persist in the existing profile database.
+  let running = false;
+  const run = async () => {
+    if (running) return;
+    running = true;
+    try {
+      const now = Date.now();
+      const life = getLifeState();
+      const idea = chooseProactiveMessage(life, now);
+      if (!idea) return;
+      for (const [jid, profile] of userProfiles.entries()) {
+        if (!eligibleForProactive(profile, now).ok) continue;
+        // Don't repeat the same life reflection topic to the same person.
+        if (profile.lastProactiveEventId === idea.eventId) continue;
+        try {
+          await sock.sendMessage(jid, { text: idea.text });
+          updateProactiveAfterSend(profile, Date.now());
+          profile.lastProactiveEventId = idea.eventId;
+          userProfiles.set(jid, profile);
+          saveDatabase();
+          console.info("[Proactive] Pesan opt-in kontekstual terkirim.");
+        } catch (error) {
+          console.error("[Proactive] Gagal mengirim:", error.message);
+        }
       }
+    } finally {
+      running = false;
     }
-  }, 3600000);
+  };
+  const interval=setInterval(() => run().catch(error =>
+    console.error("[Proactive] Scheduler gagal:",error.message)), 60*60*1000);
+  interval.unref?.();
+  return interval;
 }
 
 function normalizeText(value = "") {
