@@ -602,9 +602,11 @@ async function connectToWhatsApp() {
         ...history,
       ];
 
+      const generationStartedAt = Date.now();
       const generationResult = await getReplyFromProviders(messages, userIntent, preferredProvider, textBody, userEmotion);
       const rawReply = generationResult.rawReply;
       if (!rawReply) {
+        console.info("[AI_METRIC]", JSON.stringify({status:"no_reply", latencyMs:Date.now()-generationStartedAt}));
         console.error("Semua provider/model gagal dipakai.", generationResult.failures || []);
         await replyWithPreferredFormat(sock, sender, "lagi ada gangguan koneksi AI nih, pesannya belum bisa aku jawab.", {
           voiceReply: shouldReplyAsVoice,
@@ -613,7 +615,7 @@ async function connectToWhatsApp() {
       }
 
       const reminderData = parseReminderTag(rawReply);
-      if (reminderData) {
+      if (reminderData && userIntent === "set_reminder") {
         reminders.push({
           jid: sender,
           ...reminderData.reminder,
@@ -637,6 +639,7 @@ async function connectToWhatsApp() {
       console.log(`Mood ${sender} berubah menjadi: ${finalMood}`);
       console.log(`Self-respect ${sender}: ${relationshipState.stage} (${Math.round(relationshipState.tensionLevel || 0)}/100)`);
       console.log(`Balasan dibuat via ${generationResult.providerLabel} (${generationResult.model})`);
+      console.info("[AI_METRIC]", JSON.stringify({route:generationResult.model, upstream:generationResult.upstreamModel||null, latencyMs:Date.now()-generationStartedAt, replyChars:cleanReply.length}));
       await replyWithPreferredFormat(sock, sender, cleanReply, {
         voiceReply: shouldReplyAsVoice,
       });

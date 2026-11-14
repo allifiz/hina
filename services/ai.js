@@ -231,6 +231,7 @@ async function getReplyFromProviders(messages, userIntent, preferredProvider, ra
                 rawReply: retryReply,
                 providerLabel: provider.label,
                 model: currentModel,
+                upstreamModel: typeof retryResponse?.model === "string" ? retryResponse.model.slice(0,120) : null,
               };
             }
           } catch (retryError) {
@@ -245,6 +246,7 @@ async function getReplyFromProviders(messages, userIntent, preferredProvider, ra
           rawReply,
           providerLabel: provider.label,
           model: currentModel,
+          upstreamModel: typeof response?.model === "string" ? response.model.slice(0,120) : null,
         };
       } catch (error) {
         if (shouldSwitchModel(error) || Number(error?.status || error?.statusCode) === 403) {
