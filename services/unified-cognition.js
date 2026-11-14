@@ -1,4 +1,4 @@
-// Unified Cognitive & Decision Engine V1.
+// Unified Cognitive & Decision Engine V2.1.
 // Pure orchestration: establishes provenance, policy and bounded context
 // before provider generation; does not pretend to be autonomous consciousness.
 const MAX_CONTEXT=16000;
@@ -44,7 +44,7 @@ function composeCognitiveContext({persona="",temporal="",life="",emotion="",expr
   ["episodes",episodes,1100],
   ["chatMemory",chatMemory,1400],
   ["research",research,850],
-  ["life",life, /(?:lagi apa|ngapain|lukis|cat air|bulan|langit|musik|lagu|sunda|proyek|belajar|pendapat|minat)/i.test(userText) ? 2300 : 1000],
+  ["life",life, /(?:lagi apa|ngapain|aktivitas|lukis|cat air|bulan|langit|musik|lagu|sunda|proyek|belajar|pendapat|minat|hobi|suka|tujuan|prinsip)/i.test(userText) ? 4200 : 2300],
   ["language",language,1000],
   ["expression",expression,950],
  ];

@@ -82,14 +82,14 @@ function updateEmotion(profile,{previousMood,aiMood,userEmotion="netral",userInt
     state.energy=(state.energy+prior.energy)/2;
     state.openness=(state.openness+prior.openness)/2;
   }
-  let targetMood=VALID.has(aiMood)?aiMood:"biasa";
+  let targetMood=VALID.has(aiMood)?aiMood:classifyMood(state);
   const stage=relationshipState?.stage||"normal";
   if(stage==="heated")targetMood="marah";
   else if(stage==="cold"||stage==="annoyed")targetMood="kesal";
   else if(userIntent==="curhat"||["sedih","capek","cemas","kesepian"].includes(userEmotion))
     targetMood="sedih";
   else if(userEmotion==="senang" && targetMood==="biasa")targetMood="senang";
-  else if(replyStyle==="playful" && targetMood==="biasa")targetMood="ceria";
+  else if(replyStyle==="playful" && (targetMood==="biasa"||!VALID.has(aiMood)))targetMood="ceria";
   else if(["kesal","marah","cemburu"].includes(targetMood)&&userEmotion==="netral"&&userIntent==="short_reply")targetMood="biasa";
 
   const target=TARGETS[targetMood];
