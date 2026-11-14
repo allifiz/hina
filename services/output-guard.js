@@ -3,6 +3,7 @@
 // them as examples for the next completion.
 const META_START = /^(?:konteks|mood(?:\s+internal(?:\s+hina)?)?|nuansa(?:\s+pesan)?|batasan|analisis(?:\s+internal)?|strategi|rencana\s+jawaban|instruksi(?:\s+internal)?|catatan(?:\s+internal)?|aturan\s+jawab|self-respect)\s*:/i;
 const META_LABEL = /(?:^|\n)\s*(?:konteks|mood(?:\s+internal(?:\s+hina)?)?|nuansa(?:\s+pesan)?|batasan|analisis(?:\s+internal)?|strategi|rencana\s+jawaban|instruksi(?:\s+internal)?|catatan(?:\s+internal)?|aturan\s+jawab|self-respect)\s*:/gi;
+const STALE_MEMORY_CLAIM = /\b(?:aku|hina)\s+(?:gak|nggak|tidak|ga)\s+(?:menyimpan|simpan)\s+(?:riwayat|obrolan|chat)\b/i;
 const STALE_CAPABILITY_CLAIM = /(?:akses\s+web\s+(?:umum)?(?:ku|nya)?\s+(?:lagi\s+)?belum\s+aktif|(?:web\s+search|browsing|akses\s+internet)\s+(?:real.?time\s+)?(?:ku\s+)?(?:belum|tidak|gak|nggak)\s+(?:aktif|tersedia)|TAVILY_API_KEY\s+belum\s+diisi)/i;
 
 // Some providers start with an internal plan, then write the final reply.
@@ -82,7 +83,7 @@ function looksLikeInternalNote(content) {
 function isUnreliableAssistantContext(content) {
   const text = String(content || "").trim();
   return (META_START.test(text) && stripInternalPreamble(text) !== text) ||
-    STALE_CAPABILITY_CLAIM.test(text);
+    STALE_CAPABILITY_CLAIM.test(text) || STALE_MEMORY_CLAIM.test(text);
 }
 
 function filterContextHistory(history) {

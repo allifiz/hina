@@ -584,9 +584,7 @@ async function connectToWhatsApp() {
               persona:getHinaPersona({
                 currentMood:moodForPrompt,userName,isCreator:isOwner(sender),
                 userEmotion,userIntent,userText:textBody,timeContext:getTimeContext(),
-                relationshipMode,relationshipState,relationshipContext,profile,isOwner,
-                OWNER_NAME:require("./config").OWNER_NAME,
-                PARTNER_NAME:require("./config").PARTNER_NAME,
+                relationshipMode,relationshipState,relationshipContext,profile,
               }),
               temporal:getTemporalContext(previousUserAt,Date.now()),
               life:getLifeContext(Date.now(),undefined,textBody),
@@ -623,10 +621,10 @@ async function connectToWhatsApp() {
         saveDatabase();
       }
 
-      const { mood: aiMood, reply } = extractMoodAndCleanReply(rawReply);
+      const { mood: aiMood, reply, moodMissing } = extractMoodAndCleanReply(rawReply);
       const finalMood = updateEmotion(profile, {
         previousMood: moodForPrompt,
-        aiMood,
+        aiMood: moodMissing ? undefined : aiMood,
         userEmotion,
         userIntent,
         replyStyle: getHinaReplyStyle(textBody, userIntent, userEmotion),
@@ -639,7 +637,7 @@ async function connectToWhatsApp() {
       console.log(`Mood ${sender} berubah menjadi: ${finalMood}`);
       console.log(`Self-respect ${sender}: ${relationshipState.stage} (${Math.round(relationshipState.tensionLevel || 0)}/100)`);
       console.log(`Balasan dibuat via ${generationResult.providerLabel} (${generationResult.model})`);
-      console.info("[AI_METRIC]", JSON.stringify({route:generationResult.model, upstream:generationResult.upstreamModel||null, latencyMs:Date.now()-generationStartedAt, replyChars:cleanReply.length}));
+      console.info("[AI_METRIC]", JSON.stringify({route:generationResult.model, upstream:generationResult.upstreamModel||null, latencyMs:Date.now()-generationStartedAt, replyChars:cleanReply.length,moodMissing:!!moodMissing}));
       await replyWithPreferredFormat(sock, sender, cleanReply, {
         voiceReply: shouldReplyAsVoice,
       });

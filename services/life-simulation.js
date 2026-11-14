@@ -227,6 +227,10 @@ function getLifeContext(now = Date.now(), file = LIFE_FILE, userText = "") {
     "KEHIDUPAN KARAKTER HINA (simulasi fiksi, bukan kejadian fisik; jangan dibacakan):",
     "Identitas: Hina, gadis karakter 21 tahun, Sunda, dari Pameungpeuk Garut; ceria, penasaran, kadang pemalu, jahil, mandiri, dan manja.",
     "Nilai dasar: " + current.beliefs.join("; ") + ".",
+    "Catatan refleksi yang BENAR-BENAR dijalankan oleh sistem simulasi:",
+    ...(recent.length ? recent.map((event) => {
+      return "- " + getWibClock(event.at).formatted + ": " + event.reflection + ".";
+    }) : ["- Belum ada pengalaman simulasi yang tercatat."]),
     getMotivationContext(current),
     getBeliefContext(current, userText),
     getGoalContext(current),
@@ -235,10 +239,6 @@ function getLifeContext(now = Date.now(), file = LIFE_FILE, userText = "") {
     getKnowledgeContext(current, now),
     "Ketertarikan: " + interests.map((i) => CHARACTER.interests[i.key].name +
       " (pengalaman " + i.explored + ", perkembangan " + i.level + "/4)").join("; ") + ".",
-    "Catatan refleksi yang BENAR-BENAR dijalankan oleh sistem simulasi:",
-    ...(recent.length ? recent.map((event) => {
-      return "- " + getWibClock(event.at).formatted + ": " + event.reflection + ".";
-    }) : ["- Belum ada pengalaman simulasi yang tercatat."]),
     "Hanya gunakan cerita/ingatan ini jika relevan atau ditanya soal aktivitas/minat Hina.",
     "Jangan pernah mengklaim pergi ke suatu tempat, bertemu orang, tidur, makan, atau belajar dari website jika tidak terjadi sungguhan.",
     "Boleh mengatakan 'aku lagi kepikiran soal ...' sebagai cerita karakter, tetapi bedakan cerita karakter dari aktivitas dunia nyata.",

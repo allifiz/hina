@@ -134,32 +134,35 @@ function getReadableError(error) {
 
 function extractMoodAndCleanReply(text) {
   const raw = stripReasoningTags(text);
+  const aliases = {curious:"penasaran", penasaran:"penasaran", happy:"senang", neutral:"biasa", netral:"biasa", seneng:"senang", angry:"marah", sad:"sedih", sleepy:"mengantuk"};
+  const normalize = value => { const key = String(value).toLowerCase(); return aliases[key] || key; };
   let match = raw.match(/^\s*\[mood:\s*([a-z]+)\]\s*([\s\S]*)$/i);
-  if (match && VALID_MOODS.includes(match[1].toLowerCase()))
+  if (match && VALID_MOODS.includes(normalize(match[1])))
     return {
-      mood: match[1].toLowerCase(),
+      mood: normalize(match[1]),
       reply: match[2].trim(),
     };
   match = raw.match(/^([\s\S]*?)\s*\[mood:\s*([a-z]+)\]\s*$/i);
-  if (match && VALID_MOODS.includes(match[2].toLowerCase()))
+  if (match && VALID_MOODS.includes(normalize(match[2])))
     return {
-      mood: match[2].toLowerCase(),
+      mood: normalize(match[2]),
       reply: match[1].trim(),
     };
-  match = raw.match(/^\s*\[(ceria|senang|marah|sedih|cemburu|malu|mengantuk|biasa|kesal)\]\s*([\s\S]*)$/i);
-  if (match && VALID_MOODS.includes(match[1].toLowerCase()))
+  match = raw.match(/^\s*\[(ceria|senang|marah|sedih|cemburu|malu|mengantuk|biasa|kesal|penasaran)\]\s*([\s\S]*)$/i);
+  if (match && VALID_MOODS.includes(normalize(match[1])))
     return {
-      mood: match[1].toLowerCase(),
+      mood: normalize(match[1]),
       reply: match[2].trim(),
     };
-  match = raw.match(/^([\s\S]*?)\s*\[(ceria|senang|marah|sedih|cemburu|malu|mengantuk|biasa|kesal)\]\s*$/i);
-  if (match && VALID_MOODS.includes(match[2].toLowerCase()))
+  match = raw.match(/^([\s\S]*?)\s*\[(ceria|senang|marah|sedih|cemburu|malu|mengantuk|biasa|kesal|penasaran)\]\s*$/i);
+  if (match && VALID_MOODS.includes(normalize(match[2])))
     return {
-      mood: match[2].toLowerCase(),
+      mood: normalize(match[2]),
       reply: match[1].trim(),
     };
   return {
     mood: "biasa",
+    moodMissing: true,
     reply: raw.trim(),
   };
 }
@@ -184,8 +187,8 @@ function cleanBotReply(reply) {
     .replace(/\[[^\]]*(sistem internal|pesan sistem|jailbreak|instruksi internal|panduan karakter|guardrail|policy|mood|moodle)[^\]]*\]/gi, "")
 
     // hapus tag mood model lama
-    .replace(/^\s*\[(ceria|senang|marah|sedih|cemburu|malu|mengantuk|biasa|kesal|netral)\]\s*/i, "")
-    .replace(/\s*\[(ceria|senang|marah|sedih|cemburu|malu|mengantuk|biasa|kesal|netral)\]\s*$/i, "")
+    .replace(/^\s*\[(ceria|senang|marah|sedih|cemburu|malu|mengantuk|biasa|kesal|penasaran|netral)\]\s*/i, "")
+    .replace(/\s*\[(ceria|senang|marah|sedih|cemburu|malu|mengantuk|biasa|kesal|penasaran|netral)\]\s*$/i, "")
 
     // hapus narasi internal di awal: (marahan..., suaranya..., masih agak manja...)
     .replace(/^\s*\(([^)]*(marah|kesal|malu|ceria|seneng|manja|suara|nada|ekspresi|mood|roleplay|batin|dalam hati)[^)]*)\)\s*/gi, "")
