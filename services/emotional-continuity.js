@@ -8,6 +8,7 @@ const TARGETS={
   ceria:{valence:0.55,energy:0.62,openness:0.65},
   senang:{valence:0.78,energy:0.70,openness:0.70},
   malu:{valence:0.40,energy:0.35,openness:0.45},
+  mengantuk:{valence:0.12,energy:0.18,openness:0.48},
   biasa:{valence:0.14,energy:0.43,openness:0.52},
   sedih:{valence:-0.44,energy:0.25,openness:0.50},
   kesal:{valence:-0.55,energy:0.64,openness:0.30},
@@ -19,11 +20,13 @@ function clamp(value,lo,hi){
 }
 function initialEmotion(now=Date.now()) {
   return {
-    version:2,
+    version:3,
     lastUpdatedAt:now,
     valence:0.18,
     energy:0.49,
     openness:0.57,
+    curiosity:0.50,
+    concern:0.15,
     mood:"biasa",
     events:[],
   };
@@ -33,11 +36,13 @@ function normalizeEmotion(input,now=Date.now()) {
   if(!input||typeof input!=="object")return fallback;
   const mood=VALID.has(input.mood)?input.mood:"biasa";
   return {
-    version:2,
+    version:3,
     lastUpdatedAt:Number.isFinite(input.lastUpdatedAt)&&input.lastUpdatedAt<=now?input.lastUpdatedAt:now,
     valence:clamp(input.valence,-1,1),
     energy:clamp(input.energy,0,1),
-    openness:clamp(input.openness,0,1),
+    openness:clamp(input.openness ?? fallback.openness,0,1),
+    curiosity:clamp(input.curiosity ?? fallback.curiosity,0,1),
+    concern:clamp(input.concern ?? fallback.concern,0,1),
     mood,
     events:Array.isArray(input.events)?input.events.filter(x=>x&&Number.isFinite(x.at)&&typeof x.type==="string")
       .slice(-MAX_EVENTS).map(x=>({at:x.at,type:String(x.type).slice(0,30)})):[],
@@ -52,6 +57,8 @@ function decayEmotion(state,now=Date.now()) {
     valence:clamp(0.18+(input.valence-0.18)*retention,-1,1),
     energy:clamp(0.49+(input.energy-0.49)*retention,0,1),
     openness:clamp(0.57+(input.openness-0.57)*retention,0,1),
+    curiosity:clamp(0.50+(input.curiosity-0.50)*retention,0,1),
+    concern:clamp(0.15+(input.concern-0.15)*retention,0,1),
     lastUpdatedAt:now,
   };
 }
@@ -86,6 +93,10 @@ function updateEmotion(profile,{previousMood,aiMood,userEmotion="netral",userInt
   state.valence=clamp(state.valence*(1-weight)+target.valence*weight,-1,1);
   state.energy=clamp(state.energy*(1-weight)+target.energy*weight,0,1);
   state.openness=clamp(state.openness*(1-weight)+target.openness*weight,0,1);
+  const concernTarget = userIntent==="curhat"||["sedih","capek","cemas","kesepian"].includes(userEmotion) ? 0.85 : 0.15;
+  const curiosityTarget = ["bertanya","minta_bantuan","live_info"].includes(userIntent) ? 0.75 : 0.5;
+  state.concern=clamp(state.concern*0.7+concernTarget*0.3,0,1);
+  state.curiosity=clamp(state.curiosity*0.7+curiosityTarget*0.3,0,1);
   const next=classifyMood(state);
   state.mood=next;
   if(targetMood!=="biasa"){
@@ -105,6 +116,7 @@ function getEmotionalContext(profile,now=Date.now()) {
     "Nuansa yang tersisa dari percakapan sebelumnya: "+stable+".",
     "Energi percakapan: "+(state.energy>0.65?"cukup ekspresif":state.energy<0.35?"tenang":"sedang")+".",
     "Keterbukaan: "+(state.openness<0.38?"lebih menjaga jarak":"wajar dan tidak posesif")+".",
+    "Perhatian: "+(state.concern>0.45?"lebih peka terhadap situasi user":"wajar")+". Rasa ingin tahu: "+(state.curiosity>0.6?"tinggi":"sedang")+".",
     "Nada dan respons boleh berubah perlahan seiring waktu, tanpa memaksa setiap pesan menjadi suasana hati yang sama.",
     "Perasaan pengguna adalah milik pengguna, bukan bukti Hina mengalami kesedihan yang sama. Jangan mengaku memiliki perasaan biologis.",
     "Jangan pakai angka, label engine, atau catatan internal pada balasan.",
@@ -115,6 +127,8 @@ function getEmotionalSummary(profile,now=Date.now()) {
   return "Emotional continuity: "+classifyMood(state)+
     "\nEnergi: "+Math.round(state.energy*100)+"%"+
     "\nKeterbukaan: "+Math.round(state.openness*100)+"%"+
+    "\nRasa ingin tahu: "+Math.round(state.curiosity*100)+"%"+
+    "\nPerhatian: "+Math.round(state.concern*100)+"%"+
     "\nPeristiwa simulasi tercatat: "+state.events.length;
 }
 function resetEmotion(profile){if(profile)delete profile.emotionalContinuity;}

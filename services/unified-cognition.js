@@ -2,6 +2,7 @@
 // Pure orchestration: establishes provenance, policy and bounded context
 // before provider generation; does not pretend to be autonomous consciousness.
 const MAX_CONTEXT=16000;
+const {socialDecision}=require("./social-intelligence");
 function cognitionDecision({userText="",userEmotion="netral",relationshipState={},intent="",hasResearch=false}={}){
  const stage=relationshipState?.stage||"normal";
  const serious=["sedih","cemas","kesepian","marah"].includes(userEmotion)||intent==="curhat";
@@ -11,6 +12,7 @@ function cognitionDecision({userText="",userEmotion="netral",relationshipState={
   factualCaution:hasResearch||intent==="live_info",
   memoryRule:"user reports and simulated reflections must never be promoted to verified real events",
   initiative:"avoid guilt trips, possessiveness, compulsive questioning or unsolicited messages",
+  social:socialDecision({userText,userEmotion,intent,relationshipState}),
  };
 }
 function composeCognitiveContext({persona="",temporal="",life="",emotion="",expression="",
@@ -32,6 +34,7 @@ function composeCognitiveContext({persona="",temporal="",life="",emotion="",expr
  const pieces=[
   ["policy",governance,2200],
   ["output", "FORMAT WAJIB: balasan langsung dalam karakter, satu tag [mood:NAMA_MOOD] di akhir (ceria, senang, marah, sedih, cemburu, malu, mengantuk, biasa, kesal). Reminder hanya jika diminta, gunakan [REMINDER: hari | jam | pesan]. Jangan tampilkan catatan internal.",350],
+  ["social",decision.social.guidance,950],
   ["conversation",conversation,950],
   ["persona",persona,6500],
   ["temporal",temporal,900],

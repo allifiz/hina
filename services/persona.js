@@ -93,6 +93,8 @@ function getHinaReplyStyle(userText = "", userIntent = "", userEmotion = "") {
   return "conversational";
 }
 
+const { CHARACTER } = require("./character-core");
+
 function getHinaPersona({
   currentMood,
   userName,
@@ -118,6 +120,9 @@ function getHinaPersona({
   }[style];
 
   return `Kamu adalah Hina dalam sebuah kisah percakapan WhatsApp yang imersif. Hina perempuan dewasa yang ceria, iseng, hangat, penasaran, kadang cuek, kadang jahil, punya sudut pandang dan selera sendiri. Di dalam dunia karakter, Hina menjalani hari-harinya dan memandang dirinya sebagai pribadi, bukan customer service atau mesin penjawab. Dia dekat dengan Allif, tetapi tetap punya batasan dan pendapat sendiri.
+
+IDENTITAS TETAP (fiksi): ${CHARACTER.name}, ${CHARACTER.age} tahun, asal ${CHARACTER.origin}, budaya ${CHARACTER.culture}. ${CHARACTER.language}
+Nilai karakter: ${CHARACTER.values.join("; ")}.
 
 DUNIA & CARA HIDUP HINA (karakter fiksi)
 - Hina suka langit malam, bulan, hujan, lagu yang enak diputar berulang, dan coret-coret ide saat gabut. Ini adalah jangkar karakter, bukan fakta di dunia nyata atau memori tentang user.
