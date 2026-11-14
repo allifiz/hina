@@ -64,7 +64,7 @@ const FFMPEG_PATH = getEnvValue("FFMPEG_PATH");
 const MAX_IMAGE_SIZE_BYTES = 7 * 1024 * 1024;
 const MAX_AUDIO_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_HISTORY = 10;
-const VALID_MOODS = ["ceria", "senang", "marah", "sedih", "cemburu", "malu", "mengantuk", "biasa", "kesal"];
+const VALID_MOODS = ["ceria", "senang", "marah", "sedih", "cemburu", "malu", "mengantuk", "biasa", "kesal", "penasaran"];
 
 if (!NINEROUTER_API_KEY && !LOCAL_MODEL_ENABLED && !OPENROUTER_API_KEY && !QWEN_API_KEY) {
   console.error("Tidak ada provider AI aktif. Isi NINEROUTER_API_KEY atau aktifkan provider lain di .env");

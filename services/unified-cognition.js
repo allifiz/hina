@@ -3,6 +3,7 @@
 // before provider generation; does not pretend to be autonomous consciousness.
 const MAX_CONTEXT=16000;
 const {socialDecision}=require("./social-intelligence");
+const {capabilityContext}=require("./capability-grounding");
 function cognitionDecision({userText="",userEmotion="netral",relationshipState={},intent="",hasResearch=false}={}){
  const stage=relationshipState?.stage||"normal";
  const serious=["sedih","cemas","kesepian","marah"].includes(userEmotion)||intent==="curhat";
@@ -33,7 +34,8 @@ function composeCognitiveContext({persona="",temporal="",life="",emotion="",expr
  // or the primary governance rules when their combined size is reasonable.
  const pieces=[
   ["policy",governance,2200],
-  ["output", "FORMAT WAJIB: balasan langsung dalam karakter, satu tag [mood:NAMA_MOOD] di akhir (ceria, senang, marah, sedih, cemburu, malu, mengantuk, biasa, kesal). Reminder hanya jika diminta, gunakan [REMINDER: hari | jam | pesan]. Jangan tampilkan catatan internal.",350],
+  ["output", "FORMAT WAJIB: balasan langsung dalam karakter, satu tag [mood:NAMA_MOOD] di akhir (ceria, senang, marah, sedih, cemburu, malu, mengantuk, biasa, kesal, penasaran). Reminder hanya jika diminta, gunakan [REMINDER: hari | jam | pesan]. Jangan tampilkan catatan internal.",350],
+  ["capability",capabilityContext({chatMemory,episodes,hasResearch}),1100],
   ["social",decision.social.guidance,950],
   ["conversation",conversation,950],
   ["persona",persona,6500],
@@ -42,7 +44,7 @@ function composeCognitiveContext({persona="",temporal="",life="",emotion="",expr
   ["episodes",episodes,1100],
   ["chatMemory",chatMemory,1400],
   ["research",research,850],
-  ["life",life,2300],
+  ["life",life, /(?:lagi apa|ngapain|lukis|cat air|bulan|langit|musik|lagu|sunda|proyek|belajar|pendapat|minat)/i.test(userText) ? 2300 : 1000],
   ["language",language,1000],
   ["expression",expression,950],
  ];

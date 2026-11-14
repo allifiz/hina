@@ -9,6 +9,8 @@ const TARGETS={
   senang:{valence:0.78,energy:0.70,openness:0.70},
   malu:{valence:0.40,energy:0.35,openness:0.45},
   mengantuk:{valence:0.12,energy:0.18,openness:0.48},
+  penasaran:{valence:0.28,energy:0.52,openness:0.64},
+  cemburu:{valence:-0.18,energy:0.40,openness:0.37},
   biasa:{valence:0.14,energy:0.43,openness:0.52},
   sedih:{valence:-0.44,energy:0.25,openness:0.50},
   kesal:{valence:-0.55,energy:0.64,openness:0.30},
@@ -67,6 +69,7 @@ function classifyMood(state){
   if(state.valence < -0.28)return state.energy>0.50?"kesal":"sedih";
   if(state.valence>0.52)return state.energy>0.44?"senang":"malu";
   if(state.valence>0.24 && state.energy>0.54)return "ceria";
+  if(state.curiosity>0.67 && state.valence>=0)return "penasaran";
   return "biasa";
 }
 function updateEmotion(profile,{previousMood,aiMood,userEmotion="netral",userIntent="",replyStyle="",relationshipState={},now=Date.now()}={}) {
@@ -87,6 +90,7 @@ function updateEmotion(profile,{previousMood,aiMood,userEmotion="netral",userInt
     targetMood="sedih";
   else if(userEmotion==="senang" && targetMood==="biasa")targetMood="senang";
   else if(replyStyle==="playful" && targetMood==="biasa")targetMood="ceria";
+  else if(["kesal","marah","cemburu"].includes(targetMood)&&userEmotion==="netral"&&userIntent==="short_reply")targetMood="biasa";
 
   const target=TARGETS[targetMood];
   const weight=stage==="heated"?0.56:targetMood==="sedih"?0.38:0.34;
@@ -94,7 +98,7 @@ function updateEmotion(profile,{previousMood,aiMood,userEmotion="netral",userInt
   state.energy=clamp(state.energy*(1-weight)+target.energy*weight,0,1);
   state.openness=clamp(state.openness*(1-weight)+target.openness*weight,0,1);
   const concernTarget = userIntent==="curhat"||["sedih","capek","cemas","kesepian"].includes(userEmotion) ? 0.85 : 0.15;
-  const curiosityTarget = ["bertanya","minta_bantuan","live_info"].includes(userIntent) ? 0.75 : 0.5;
+  const curiosityTarget = targetMood==="penasaran" ? 0.9 : ["bertanya","minta_bantuan","live_info"].includes(userIntent) ? 0.75 : 0.5;
   state.concern=clamp(state.concern*0.7+concernTarget*0.3,0,1);
   state.curiosity=clamp(state.curiosity*0.7+curiosityTarget*0.3,0,1);
   const next=classifyMood(state);
