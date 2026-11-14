@@ -32,11 +32,17 @@ function eligibleForProactive(profile,now=Date.now()) {
   if(count>=WEEKLY_LIMIT) return {ok:false,reason:"weekly_limit"};
   return {ok:true,reason:"opted_in"};
 }
-function chooseProactiveMessage(life,now=Date.now()) {
-  const recent=(life?.experiences||[]).filter(e=>e&&REASONS.includes(e.interest)).slice(-4);
+function chooseProactiveMessage(life,now=Date.now(),profile={}) {
+  if(life?.paused) return null;
+  const seen=new Set([profile.lastProactiveEventId,...(Array.isArray(profile.proactiveEventIds)?profile.proactiveEventIds:[])]);
+  const recent=(life?.experiences||[]).filter(e=>e&&e.id&&REASONS.includes(e.interest)&&Number.isFinite(e.at)&&now-e.at<=3*DAY&&e.at<=now&&!seen.has(e.id)).slice(-12);
   if(!recent.length) return null;
-  const event=recent[recent.length-1];
-  if(!Number.isFinite(event.at)||now-event.at>3*DAY||event.at>now) return null;
+  const topic=String(profile.lastTopic||"").toLowerCase();
+  const hints={watercolor:/lukis|cat air|warna/,moon:/bulan|langit/,music:/musik|lagu/,language:/bahasa|sunda/};
+  // Only generic fictional interests, never owner project contents or private chat.
+  const ranked=recent.map(e=>({e,score:(hints[e.interest].test(topic)?2:0)+(e.interest!==profile.lastProactiveInterest?1:0)}))
+    .sort((a,b)=>b.score-a.score||b.e.at-a.e.at);
+  const event=ranked[0].e;
   return {text:SAMPLES[event.interest],interest:event.interest,eventId:event.id};
 }
 function updateProactiveAfterSend(profile,now=Date.now()){

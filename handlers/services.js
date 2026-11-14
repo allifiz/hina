@@ -46,16 +46,16 @@ function startProactiveMessaging(sock, userProfiles, saveDatabase) {
     try {
       const now = Date.now();
       const life = getLifeState();
-      const idea = chooseProactiveMessage(life, now);
-      if (!idea) return;
       for (const [jid, profile] of userProfiles.entries()) {
-        if (!eligibleForProactive(profile, now).ok) continue;
-        // Don't repeat the same life reflection topic to the same person.
-        if (profile.lastProactiveEventId === idea.eventId) continue;
+        if (!eligibleForProactive(profile, Date.now()).ok) continue;
+        const idea = chooseProactiveMessage(life, now, profile);
+        if (!idea) continue;
         try {
           await sock.sendMessage(jid, { text: idea.text });
           updateProactiveAfterSend(profile, Date.now());
           profile.lastProactiveEventId = idea.eventId;
+          profile.lastProactiveInterest = idea.interest;
+          profile.proactiveEventIds = [...(Array.isArray(profile.proactiveEventIds) ? profile.proactiveEventIds : []), idea.eventId].slice(-20);
           userProfiles.set(jid, profile);
           saveDatabase();
           console.info("[Proactive] Pesan opt-in kontekstual terkirim.");

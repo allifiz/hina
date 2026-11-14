@@ -47,6 +47,7 @@ const { researchProject, attachResearch, formatResearch } = require("./services/
 const { verifyProjectKnowledge, attachReview, formatReview } = require("./services/knowledge-verification");
 const { toggleLearning, runLearningCycle, learningSummary, startLearningScheduler } = require("./services/autonomous-learning");
 const { composeCognitiveContext } = require("./services/unified-cognition");
+const { conversationGuidance, useInstantConversation } = require("./services/natural-conversation");
 const { foundationSummary } = require("./services/foundation-health");
 const { projectSummary,parseProposal,createCandidate,activateCandidate,saveArtifact,
   setProjectStatus,ideationMessages,artifactMessages } = require("./services/creative-projects");
@@ -533,7 +534,7 @@ async function connectToWhatsApp() {
       }
 
       const instantReply = getInstantReply(textBody, userName);
-      if (instantReply && userIntent === "short_reply" && shouldUseInstantReply(relationshipState)) {
+      if (instantReply && userIntent === "short_reply" && shouldUseInstantReply(relationshipState) && useInstantConversation(textBody, previousUserAt)) {
         appendChatMessage(sender, "user", textBody);
         await replyWithPreferredFormat(sock, sender, instantReply, {
           voiceReply: shouldReplyAsVoice,
@@ -591,6 +592,8 @@ async function connectToWhatsApp() {
               life:getLifeContext(Date.now(),undefined,textBody),
               emotion:emotionalContext,expression:expressionContext,
               language:languageContext,chatMemory:relevantMemory,episodes:episodeContext,
+              conversation:conversationGuidance({history,intent:userIntent,emotion:userEmotion,userText:textBody,relationshipState}),
+              hasResearch:!!liveContext,
               userText:textBody,userEmotion,relationshipState,intent:userIntent,
             }),
         },
@@ -599,18 +602,20 @@ async function connectToWhatsApp() {
         ...history,
       ];
 
+      const generationStartedAt = Date.now();
       const generationResult = await getReplyFromProviders(messages, userIntent, preferredProvider, textBody, userEmotion);
       const rawReply = generationResult.rawReply;
       if (!rawReply) {
+        console.info("[AI_METRIC]", JSON.stringify({status:"no_reply", latencyMs:Date.now()-generationStartedAt}));
         console.error("Semua provider/model gagal dipakai.", generationResult.failures || []);
-        await replyWithPreferredFormat(sock, sender, "huee... maaf banget kak, OpenRouter sama cadangan modelku lagi gagal semua >w< coba lagi bentar yaa...", {
+        await replyWithPreferredFormat(sock, sender, "lagi ada gangguan koneksi AI nih, pesannya belum bisa aku jawab.", {
           voiceReply: shouldReplyAsVoice,
         });
         return;
       }
 
       const reminderData = parseReminderTag(rawReply);
-      if (reminderData) {
+      if (reminderData && userIntent === "set_reminder") {
         reminders.push({
           jid: sender,
           ...reminderData.reminder,
@@ -634,6 +639,7 @@ async function connectToWhatsApp() {
       console.log(`Mood ${sender} berubah menjadi: ${finalMood}`);
       console.log(`Self-respect ${sender}: ${relationshipState.stage} (${Math.round(relationshipState.tensionLevel || 0)}/100)`);
       console.log(`Balasan dibuat via ${generationResult.providerLabel} (${generationResult.model})`);
+      console.info("[AI_METRIC]", JSON.stringify({route:generationResult.model, upstream:generationResult.upstreamModel||null, latencyMs:Date.now()-generationStartedAt, replyChars:cleanReply.length}));
       await replyWithPreferredFormat(sock, sender, cleanReply, {
         voiceReply: shouldReplyAsVoice,
       });

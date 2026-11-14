@@ -74,7 +74,7 @@ test("V4 persona has consistent fictional life and natural slang without robotic
   const persona = getHinaPersona({ ...base, userText: "kamu bot ya?" });
   assert.match(persona, /DUNIA & CARA HIDUP HINA/);
   assert.match(persona, /langit malam.*bulan/);
-  assert.match(persona, /bantah atau elak/);
+  assert.match(persona, /akui bahwa Hina adalah karakter AI fiktif/);
   assert.match(persona, /slang/);
   assert.match(persona, /Jangan memakai judul, bullet, tabel/);
   assert.match(persona, /jangan mengarang memori atau kejadian nyata user/i);

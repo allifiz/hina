@@ -2,6 +2,7 @@
 // Pure orchestration: establishes provenance, policy and bounded context
 // before provider generation; does not pretend to be autonomous consciousness.
 const MAX_CONTEXT=16000;
+const {socialDecision}=require("./social-intelligence");
 function cognitionDecision({userText="",userEmotion="netral",relationshipState={},intent="",hasResearch=false}={}){
  const stage=relationshipState?.stage||"normal";
  const serious=["sedih","cemas","kesepian","marah"].includes(userEmotion)||intent==="curhat";
@@ -11,12 +12,13 @@ function cognitionDecision({userText="",userEmotion="netral",relationshipState={
   factualCaution:hasResearch||intent==="live_info",
   memoryRule:"user reports and simulated reflections must never be promoted to verified real events",
   initiative:"avoid guilt trips, possessiveness, compulsive questioning or unsolicited messages",
+  social:socialDecision({userText,userEmotion,intent,relationshipState}),
  };
 }
 function composeCognitiveContext({persona="",temporal="",life="",emotion="",expression="",
- language="",chatMemory="",episodes="",research="",userText="",userEmotion="netral",
+ language="",chatMemory="",episodes="",research="",conversation="",hasResearch=false,userText="",userEmotion="netral",
  relationshipState={},intent=""}={}){
- const decision=cognitionDecision({userText,userEmotion,relationshipState,intent,hasResearch:!!research});
+ const decision=cognitionDecision({userText,userEmotion,relationshipState,intent,hasResearch:hasResearch||!!research});
  const governance=[
   "UNIFIED COGNITIVE POLICY (internal):",
   "Prioritas: keselamatan dan batasan > akurasi bukti > privasi dan izin > karakter > variasi gaya.",
@@ -31,14 +33,17 @@ function composeCognitiveContext({persona="",temporal="",life="",emotion="",expr
  // or the primary governance rules when their combined size is reasonable.
  const pieces=[
   ["policy",governance,2200],
-  ["persona",persona,4800],
+  ["output", "FORMAT WAJIB: balasan langsung dalam karakter, satu tag [mood:NAMA_MOOD] di akhir (ceria, senang, marah, sedih, cemburu, malu, mengantuk, biasa, kesal). Reminder hanya jika diminta, gunakan [REMINDER: hari | jam | pesan]. Jangan tampilkan catatan internal.",350],
+  ["social",decision.social.guidance,950],
+  ["conversation",conversation,950],
+  ["persona",persona,6500],
   ["temporal",temporal,900],
   ["emotion",emotion,700],
-  ["life",life,4200],
   ["episodes",episodes,1100],
+  ["chatMemory",chatMemory,1400],
   ["research",research,850],
-  ["language",language,1700],
-  ["chatMemory",chatMemory,1100],
+  ["life",life,2300],
+  ["language",language,1000],
   ["expression",expression,950],
  ];
  let remaining=MAX_CONTEXT,output="";
