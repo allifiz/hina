@@ -1,0 +1,26 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const {createTakeover,normalizeJid}=require("../services/human-takeover");
+test("human takeover persists, handles PN and LID, and allows other mapped contacts",async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),"hina-takeover-"));
+ t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const file=path.join(dir,"takeover.json"),phone="628000000000",pn=phone+"@s.whatsapp.net",lid="12345@lid";
+ const sock={signalRepository:{lidMapping:{getPNForLID:async j=>j==="999@lid"?"628111111111@s.whatsapp.net":null}}};
+ let state=createTakeover(file);
+ assert.equal(normalizeJid("12345:7@lid"),lid);
+ assert.equal(await state.blocked(sock,lid),false);
+ assert.equal(state.set(phone,true),true);
+ assert.equal(await state.blocked(sock,pn),true);
+ assert.equal(await state.blocked(sock,"999@lid"),false);
+ assert.equal(await state.blocked(sock,lid),true);
+ assert.equal(await state.blocked(sock,lid,pn),true);
+ assert.equal(await state.blocked(sock,"777@lid"),false);
+ state=createTakeover(file);
+ assert.equal(state.status(phone),true);
+ assert.equal(await state.blocked(sock,lid),true);
+ assert.equal(state.set(phone,false),false);
+ assert.equal(await state.blocked(sock,lid),false);
+});
