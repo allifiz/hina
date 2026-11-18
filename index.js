@@ -1,6 +1,8 @@
 const { Boom } = require("@hapi/boom");
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
 const qrcode = require("qrcode-terminal");
+const {createTakeover} = require("./services/human-takeover");
+const {startLeadFlowGateway} = require("./services/leadflow-gateway");
 
 // Config & Services
 const { MAX_HISTORY, QWEN_API_KEY } = require("./config");
@@ -81,6 +83,8 @@ const userMoods = new Map();
 let reminders = null;
 let isServicesStarted = false;
 let activeSocket = null;
+let socketConnected = false;
+const takeover = createTakeover(process.env.LEADFLOW_TAKEOVER_FILE || "./store/leadflow-takeover.json");
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 
@@ -135,6 +139,13 @@ async function connectToWhatsApp() {
   });
 
   activeSocket = sock;
+  socketConnected = false;
+  // Final guard also covers reminders, proactive messages and replies already in flight.
+  const originalSend = sock.sendMessage.bind(sock);
+  sock.sendMessage = async (jid, ...args) => {
+    if (await takeover.blocked(sock, jid)) throw Error("Human takeover active");
+    return originalSend(jid, ...args);
+  };
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", async (update) => {
@@ -147,6 +158,7 @@ async function connectToWhatsApp() {
       });
     if (connection === "close") {
       activeSocket = null;
+      socketConnected = false;
       const statusCode = lastDisconnect?.error instanceof Boom ? lastDisconnect.error.output?.statusCode : null;
       if (statusCode !== DisconnectReason.loggedOut) {
         scheduleReconnect("WhatsApp disconnected" + (statusCode ? " (" + statusCode + ")" : ""));
@@ -154,6 +166,7 @@ async function connectToWhatsApp() {
         console.error("[Connection] WhatsApp session invalid (401). Pair again with a new QR; do not auto-retry the same credentials.");
       }
     } else if (connection === "open") {
+      socketConnected = true;
       reconnectAttempts = 0;
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
@@ -176,6 +189,7 @@ async function connectToWhatsApp() {
     if (!msg?.message || msg.key.fromMe || msg.key.remoteJid?.endsWith("@g.us")) return;
 
     const sender = msg.key.remoteJid;
+    if (await takeover.blocked(sock, sender, msg.key.remoteJidAlt)) return;
     const textFromMessage = getTextFromMessage(msg.message);
     const mediaDescriptor = getMediaDescriptor(msg.message);
 
@@ -644,6 +658,7 @@ async function connectToWhatsApp() {
       recordExpression(profile, cleanReply);
       appendChatMessage(sender, "assistant", cleanReply);
     } catch (error) {
+      if (error.message === "Human takeover active" || await takeover.blocked(sock, sender, msg.key.remoteJidAlt)) return;
       console.error("Terjadi kesalahan API:", error.message || error);
       await replyText(sock, sender, "ih, kok tiba-tiba lemot ya... aku lagi error nih kak >w< bentar lagi coba lagi ya...");
     } finally {
@@ -653,6 +668,7 @@ async function connectToWhatsApp() {
 }
 
 loadDatabase();
+startLeadFlowGateway({takeover,getSocket:()=>activeSocket,isConnected:()=>socketConnected});
 startLifeSimulation();
 startLearningScheduler({getState:getLifeState,save:saveLifeState});
 reminders = getReminders();
