@@ -84,6 +84,7 @@ let reminders = null;
 let isServicesStarted = false;
 let activeSocket = null;
 let socketConnected = false;
+let leadFlowRawSend = null;
 const takeover = createTakeover(process.env.LEADFLOW_TAKEOVER_FILE || "./store/leadflow-takeover.json");
 let reconnectTimer = null;
 let reconnectAttempts = 0;
@@ -142,6 +143,7 @@ async function connectToWhatsApp() {
   socketConnected = false;
   // Final guard also covers reminders, proactive messages and replies already in flight.
   const originalSend = sock.sendMessage.bind(sock);
+  leadFlowRawSend = originalSend;
   sock.sendMessage = async (jid, ...args) => {
     if (await takeover.blocked(sock, jid)) throw Error("Human takeover active");
     return originalSend(jid, ...args);
@@ -159,6 +161,7 @@ async function connectToWhatsApp() {
     if (connection === "close") {
       activeSocket = null;
       socketConnected = false;
+      leadFlowRawSend = null;
       const statusCode = lastDisconnect?.error instanceof Boom ? lastDisconnect.error.output?.statusCode : null;
       if (statusCode !== DisconnectReason.loggedOut) {
         scheduleReconnect("WhatsApp disconnected" + (statusCode ? " (" + statusCode + ")" : ""));
@@ -668,7 +671,13 @@ async function connectToWhatsApp() {
 }
 
 loadDatabase();
-startLeadFlowGateway({takeover,getSocket:()=>activeSocket,isConnected:()=>socketConnected});
+startLeadFlowGateway({
+  takeover,getSocket:()=>activeSocket,isConnected:()=>socketConnected,
+  sendApprovedMessage:async (jid,text)=>{
+    if(!socketConnected||!leadFlowRawSend)throw Error("WhatsApp disconnected");
+    return leadFlowRawSend(jid,{text});
+  }
+});
 startLifeSimulation();
 startLearningScheduler({getState:getLifeState,save:saveLifeState});
 reminders = getReminders();
