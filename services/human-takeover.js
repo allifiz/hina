@@ -10,7 +10,7 @@ function createTakeover(file) {
   let state = {};
   try { state = JSON.parse(fs.readFileSync(file, "utf8")); }
   catch (e) { if (e.code !== "ENOENT") throw e; }
-  if (!state || typeof state !== "object" || Array.isArray(state)) throw Error("Invalid takeover state");
+  if (!state || typeof state !== "object" || Array.isArray(state) || Object.entries(state).some(([p,a])=>!/^628\d{7,12}$/.test(p)||!Array.isArray(a)||!a.includes(p+"@s.whatsapp.net")||a.some(j=>normalizeJid(j)!==j))) throw Error("Invalid takeover state");
   const ids = () => new Set(Object.values(state).flat());
   const status = phone => Object.hasOwn(state, phone);
   function set(phone, enabled, aliases = []) {
@@ -29,15 +29,24 @@ function createTakeover(file) {
     const known = ids();
     if (!known.size) return false;
     const aliases = values.map(normalizeJid).filter(Boolean);
-    if (aliases.some(j => known.has(j))) return true;
-    if (aliases.some(j => j.endsWith("@s.whatsapp.net"))) return false;
+    const pn = aliases.find(j => j.endsWith("@s.whatsapp.net"));
+    const lid = aliases.find(j => j.endsWith("@lid"));
+    const remember = (phoneJid, lidJid) => {
+      if(!phoneJid||!lidJid)return;
+      const phone = phoneJid.split("@")[0];
+      if(status(phone)&&!state[phone].includes(lidJid)){
+        try{set(phone,true,[lidJid]);}catch{}
+      }
+    };
+    if (aliases.some(j => known.has(j))) {remember(pn,lid);return true;}
+    if (pn) return false;
     for (const lid of aliases.filter(j => j.endsWith("@lid"))) {
       try {
         const pn = normalizeJid(await sock.signalRepository?.lidMapping?.getPNForLID(lid));
-        if (pn) return ids().has(pn) || ids().has(lid);
+        if (pn) {const hit=ids().has(pn)||ids().has(lid);if(hit)remember(pn,lid);return hit;}
       } catch {}
       // Never let an unresolved LID bypass a takeover. Other known PN contacts work normally.
-      return true;
+      return Object.values(state).some(list=>!list.some(j=>j.endsWith("@lid")));
     }
     return false;
   }
