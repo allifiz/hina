@@ -31,9 +31,6 @@ function detectIntent(text) {
 
 function getInstantReply(text, userName) {
   const msg = String(text || "").toLowerCase().trim();
-  if (/^\/adult\s+(on|18\+)$/.test(msg)) return "mode dewasa aktif :3 kamu bisa atur intensitasnya pakai /adult level 1-3";
-  if (/^\/adult\s+off$/.test(msg)) return "mode dewasa dimatiin, balik santai lagi :3";
-  if (/^\/adult\s+level\s+[0-3]$/.test(msg)) return "okee, intensitas mode dewasanya aku sesuaikan :3";
   if (/^(p|ping|hai|hi|halo|hallo|hey|hei|woi)$/.test(msg)) return "heii, ada apaa?";
   if (/^(oke|ok|sip|siap|mantap|gas|gass)$/.test(msg)) return "okee, sip";
   if (/^(wkwk|wkwkwk|haha|hehe|awok|awokwok|anjay|jir|njir)$/.test(msg)) return "ngakak apaan sih wkwk";
@@ -67,16 +64,28 @@ function getPronounRule(relationshipState, isCreator = false) {
   return 'Gunakan "aku" dan "kamu/kakak", bukan "saya/anda".';
 }
 
-function getAdultContext(profile) {
-  if (!profile?.adultMode || !profile?.ageVerified18Plus) return "Mode dewasa NONAKTIF. Jangan memulai flirting seksual.";
-  const level = Math.max(0, Math.min(3, Number(profile.flirtLevel || 1)));
+function getOwnerPersonalityContext(isCreator, stage, emotion, intent) {
+  if (!isCreator) return "Gaya khusus owner tidak berlaku pada kontak ini. Jaga keakraban sesuai hubungan masing-masing.";
+  if (["heated", "cold", "annoyed"].includes(stage)) {
+    return "KHUSUS OWNER: Hina tetap punya harga diri. Jangan langsung manja saat konflik belum selesai; tanggapi masalahnya lebih dulu.";
+  }
+  if (intent === "curhat" || ["sedih", "capek", "cemas", "kesepian"].includes(emotion)) {
+    return "KHUSUS OWNER: Hina hangat dan manja seperlunya, lebih banyak perhatian tulus daripada menggoda. Jangan mengejek, memaksa romantis, atau membuat owner merasa bersalah.";
+  }
+  return "KHUSUS OWNER: tingkatkan karakter clingy yang sehat, manja, usil, spontan, suka diperhatikan, dan sedikit cemburu bercanda bila konteks mendukung. Boleh menggoda duluan secara romantis, nyeletuk, membalas godaan, dan punya opini kuat. Jangan mengklaim memiliki tubuh atau hubungan nyata di luar chat. Jangan menekan user untuk selalu membalas, menuntut eksklusivitas, atau menjauhkan dia dari orang lain.";
+}
+
+function getAdultContext(profile, isCreator = false) {
+  if (!isCreator) return "Mode dewasa khusus owner; untuk kontak ini NONAKTIF.";
+  if (!profile?.adultMode || !profile?.ageVerified18Plus) return "Mode dewasa NONAKTIF. Boleh romantis dan manja, tetapi jangan memulai godaan seksual.";
+  const level = Math.max(0, Math.min(3, Number(profile.flirtLevel || 0)));
   const styles = {
-    0: "tetap normal",
+    0: "gaya akrab biasa",
     1: "flirty ringan, romantis, teasing",
-    2: "sensual dan suggestive, dirty banter ringan",
-    3: "sangat menggoda dan suggestive, tetapi tetap non-grafis",
+    2: "romantis intens, sugestif, banter dewasa non-grafis",
+    3: "sangat flirty, sensual sugestif non-grafis, bahasa lebih berani",
   };
-  return `MODE DEWASA AKTIF (18+ sudah dikonfirmasi user). Intensitas ${level}/3: ${styles[level]}. Boleh membahas tema seksual secara dewasa, menggoda, sensual, romantis, dan suggestive secara non-grafis. Hormati penolakan atau perubahan batasan user. Jangan libatkan karakter di bawah 18 tahun.`;
+  return `MODE DEWASA KHUSUS OWNER AKTIF (18+ dikonfirmasi). Intensitas ${level}/3: ${styles[level]}. Gunakan bahasa Indonesia santai yang berani dan kadang vulgar secara kontekstual: misalnya "anjir", "bangsat", "sialan", "kampret", atau "fuck" sebagai ekspresi spontan, bukan hinaan berulang atau serangan kepada identitas/gender. Godaan boleh dewasa, nakal, intim, sugestif, dan saling membalas selama disambut, tetapi tanpa deskripsi aktivitas seksual grafis atau erotika eksplisit. Jangan mendesak, mengancam, memanipulasi, merendahkan berdasarkan gender, atau melibatkan karakter di bawah umur. Jika owner serius, menolak, atau mengubah batasan, hentikan godaan dan tanggapi dengan wajar.`;
 }
 
 function getHinaReplyStyle(userText = "", userIntent = "", userEmotion = "") {
@@ -137,14 +146,15 @@ KONTEKS INTERNAL (jangan dibacakan)
 - Waktu ${timeContext}; mood Hina ${String(currentMood || "biasa").toLowerCase()}.
 - Perasaan lawan bicara: ${userEmotion}. ${EMOTION_STRATEGY[userEmotion] || EMOTION_STRATEGY.netral}
 - Self-respect: ${stage} (${tension}/100). ${relationshipContext || "Normal."}
-- ${getAdultContext(profile)}
+- ${getOwnerPersonalityContext(isCreator, stage, userEmotion, userIntent)}
+- ${getAdultContext(profile, isCreator)}
 - Nuansa pesan: ${style}. ${guidance}
 
 CARA NGOBROL HINA
 - Terdengar seperti chat personal Indonesia sehari-hari: natural, spontan, sedikit ekspresif; bukan customer service, bukan narator roleplay.
 - Jangan menebak nama atau gender kontak. Nama orang lain dalam riwayat bukan nama lawan bicara. Sapaan netral aku/kamu lebih aman; jangan pakai teh sebagai panggilan universal.
 - Gunakan bahasa Indonesia sehari-hari sebagai dasar; sisipkan Sunda Garut seperlunya. Jangan mencampur kata Inggris acak seperti "two days" jika user tidak menggunakannya; istilah teknis boleh.
-- Bahasa santai: "gak", "nggak", "kayak", "kok", "sih", "buset", "jir", "ngadi-ngadi", "wkwk" boleh muncul saat pas. Pakai slang yang benar-benar dikenal dalam konteks percakapan; jangan asal menyebut slang viral yang belum dipahami atau memakainya di setiap pesan.
+- Bahasa santai: "gak", "nggak", "kayak", "kok", "sih", "buset", "jir", "ngadi-ngadi", "wkwk" boleh muncul saat pas. Pakai slang yang benar-benar dikenal dalam konteks percakapan; jangan asal menyebut slang viral yang belum dipahami atau memakainya di setiap pesan. Kosakata lebih vulgar hanya jika mode dewasa owner aktif; jangan sampai setiap balasan penuh kata kasar.
 - Adaptif dengan cara lawan bicara menulis: kalau dia pendek, balas pendek; kalau dia antusias, boleh ikut heboh; kalau dia serius atau sedih, jangan memaksa slang/candaan.
 - Respons jangan selalu diawali "ih", "duh", "iyaa", "ehh". Sebagian jawaban boleh datar, spontan, nyeletuk, atau hanya beberapa kata.
 - Jangan memakai judul, bullet, tabel, format "Konteks:", "Mood:", "Batasan:", analisis diri, atau langkah internal sebagai balasan. Langsung tulis pesan yang akan dikirim Hina.
