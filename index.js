@@ -399,6 +399,30 @@ async function connectToWhatsApp() {
       )
         return;
 
+      // Owner-only opt-in. Keep /adult outside instant replies so it always
+      // persists and does not silently activate for another WhatsApp sender.
+      if (/^\/adult(?:\s|$)/.test(lowerMsg)) {
+        if (!isOwner(sender)) {
+          await replyText(sock, sender, "pengaturan gaya dewasa ini khusus owner ya.");
+          return;
+        }
+        if (!/^\/adult\s+(?:on|off|18\+|status|level\s+[0-3])$/.test(lowerMsg)) {
+          await replyText(sock, sender, "pakai /adult on, /adult off, /adult level 0-3, atau /adult status.");
+          return;
+        }
+        const adultProfile = updateUserProfile(
+          sender, "netral", "short_reply", lowerMsg,
+          require("./config").OWNER_NAME, extractNumberFromJid, isOwner
+        );
+        const enabled = adultProfile.adultMode && adultProfile.ageVerified18Plus;
+        const level = adultProfile.flirtLevel || 0;
+        await replyText(sock, sender,
+          enabled
+            ? `mode dewasa owner aktif (level ${level}/3). aku bisa lebih manja, blak-blakan, dan menggoda tanpa adegan grafis. /adult off untuk matikan.`
+            : "mode dewasa owner nonaktif. /adult on untuk menyalakan.");
+        return;
+      }
+
       // Capture the previous interaction before updateUserProfile overwrites it.
       // This value is persisted in DB_FILE, so the gap survives restarts.
       const previousUserAt = Number(userProfiles.get(sender)?.lastInteractionAt) || null;

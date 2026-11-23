@@ -149,7 +149,8 @@ function getUserProfile(sender, fallbackName, extractNumberFromJid, isOwner) {
   return profile;
 }
 
-function applyAdultModeCommand(profile, text) {
+function applyAdultModeCommand(profile, text, ownerAuthorized = false) {
+  if (!ownerAuthorized) return;
   const msg = String(text || "").toLowerCase().trim();
   if (/^\/adult\s+(on|18\+)$/.test(msg)) {
     profile.ageVerified18Plus = true;
@@ -169,7 +170,7 @@ function applyAdultModeCommand(profile, text) {
 
 function updateUserProfile(sender, emotion, intent, text, fallbackName, extractNumberFromJid, isOwner) {
   const profile = getUserProfile(sender, fallbackName, extractNumberFromJid, isOwner);
-  applyAdultModeCommand(profile, text);
+  applyAdultModeCommand(profile, text, Boolean(isOwner(sender)));
   profile.messageCount += 1;
   profile.lastEmotion = emotion;
   profile.lastIntent = intent;
@@ -234,6 +235,7 @@ module.exports = {
   reminders,
   isPrivilegedUser,
   getUserProfile,
+  applyAdultModeCommand,
   updateUserProfile,
   getChatHistory,
   appendChatMessage,

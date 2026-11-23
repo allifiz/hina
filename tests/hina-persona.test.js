@@ -88,3 +88,34 @@ test("persona guards against fabricated details and awkward thanks for teasing",
   assert.match(playful, /jangan justru berterima kasih karena bikin orang kesal/);
   assert.match(playful, /maksimal satu pertanyaan lanjutan/);
 });
+
+test("owner-only clingy personality is contextual and absent from other contacts", () => {
+  const owner = getHinaPersona({ ...base, isCreator: true, relationshipMode: "owner", userText: "kangen" });
+  const stranger = getHinaPersona({ ...base, isCreator: false, userText: "kangen" });
+  assert.match(owner, /KHUSUS OWNER: tingkatkan karakter clingy/);
+  assert.doesNotMatch(stranger, /KHUSUS OWNER: tingkatkan karakter clingy/);
+  assert.match(stranger, /Mode dewasa khusus owner; untuk kontak ini NONAKTIF/);
+});
+
+test("owner adult style is gated and non-graphic", () => {
+  const adult = { ...base, isCreator: true, relationshipMode: "owner", profile: { intimacy: 8, adultMode: true, ageVerified18Plus: true, flirtLevel: 3 } };
+  const prompt = getHinaPersona({ ...adult, userText: "godain aku" });
+  assert.match(prompt, /MODE DEWASA KHUSUS OWNER AKTIF/);
+  assert.match(prompt, /bahasa lebih berani/);
+  assert.match(prompt, /tanpa deskripsi aktivitas seksual grafis/);
+  assert.doesNotMatch(getHinaPersona({ ...adult, isCreator: false }), /MODE DEWASA KHUSUS OWNER AKTIF/);
+  assert.doesNotMatch(getHinaPersona({ ...adult, profile: { ...adult.profile, adultMode: false } }), /MODE DEWASA KHUSUS OWNER AKTIF/);
+});
+
+test("adult mode commands may only change owner profile settings", () => {
+  const { applyAdultModeCommand } = require("../services/database");
+  const other = { adultMode: false, ageVerified18Plus: false, flirtLevel: 0 };
+  applyAdultModeCommand(other, "/adult on", false);
+  assert.deepEqual(other, { adultMode: false, ageVerified18Plus: false, flirtLevel: 0 });
+  const owner = { adultMode: false, ageVerified18Plus: false, flirtLevel: 0 };
+  applyAdultModeCommand(owner, "/adult on", true);
+  applyAdultModeCommand(owner, "/adult level 3", true);
+  assert.deepEqual(owner, { adultMode: true, ageVerified18Plus: true, flirtLevel: 3 });
+  applyAdultModeCommand(owner, "/adult off", true);
+  assert.equal(owner.adultMode, false);
+});
